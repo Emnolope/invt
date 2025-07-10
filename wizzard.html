@@ -188,6 +188,7 @@ const Wizard = (function() {
         input.type = fieldConfig.type === 'multiple' ? 'checkbox' : 'radio';
         input.value = option;
         input.className = 'wizard-input';
+        input.name = `field-${fieldIndex}`;
         input.onchange = () => {
           if (input.checked) {
             grab(fieldName, option, fieldConfig);
