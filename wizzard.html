@@ -142,6 +142,7 @@ const Wizard = (function() {
   function init() {
     container = document.getElementById('wizardOverlay');
     panels = document.getElementById('wizardPanels');
+    panels.innerHTML = '';
     navi = document.getElementById('wizardNavi');
     navi.innerHTML = '';
     [
@@ -156,8 +157,6 @@ const Wizard = (function() {
     });
   }
   function build() {
-    if (!container) init();
-    panels.innerHTML = '';
     screens = [];
     const schemaKeys = Object.keys(schema);
     schemaKeys.forEach((fieldName, index) => {
@@ -174,11 +173,13 @@ const Wizard = (function() {
       screen.style.cssText = 'grid-template-columns:1fr;grid-template-rows:1fr';
       const textarea = document.createElement('textarea');
       textarea.className = 'wizard-text';
-      textarea.placeholder = `Enter ${fieldName}...`;
+      textarea.placeholder = `Description`;
       textarea.oninput = () => grab(fieldName, textarea.value, fieldConfig);
       screen.appendChild(textarea);
     } else {
-      const options = fieldConfig.type === 'boolean' ? [fieldConfig.true, fieldConfig.false] : fieldConfig.options;
+      const options = fieldConfig.type === 'boolean' 
+        ? [fieldConfig.true, fieldConfig.false] 
+        : fieldConfig.options;
       const grid = gridSizer(options.length, panels.offsetWidth / panels.offsetHeight);
       screen.style.cssText = `grid-template-columns:repeat(${grid.cols},1fr);grid-template-rows:repeat(${grid.rows},1fr)`;
       options.forEach((option, optionIndex) => {
@@ -187,19 +188,12 @@ const Wizard = (function() {
         input.value = option;
         input.className = 'wizard-input';
         input.name = `field-${fieldIndex}`;
-        input.id = `field-${fieldIndex}-option-${optionIndex}`;
-
         input.onchange = () => {
-          if (input.checked) {
-            grab(fieldName, option, fieldConfig);
-          } else if (fieldConfig.type === 'multiple') {
-            grab(fieldName, option, fieldConfig); // grab handles toggle logic
-          }
+          grab(fieldName, option, fieldConfig);
         };
         const label = document.createElement('label');
         label.className = 'wizard-label';
         label.textContent = option;
-        label.htmlFor = input.id;
         screen.appendChild(input);
         screen.appendChild(label);
       });
