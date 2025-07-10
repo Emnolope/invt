@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { height: 100vh; display: flex; flex-direction: column; font-family: Arial, sans-serif; }
+
+#wizardOverlay {
+  display: none;
+  height: 100vh;
+  flex-direction: column;
+}
+
+.wizardPane {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  padding: 2px;
+  background: #000;
+}
+
+.wizard-screen {
+  display: none;
+}
+
+.wizard-screen.active {
+  display: grid;
+}
+
+#wizardNavi {
+  height: 80px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 2px;
+  padding: 2px;
+  background: #000;
+}
+
+.wizard-input {
+  display: none;
+}
+
+.wizard-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ddd;
+  font-size: 2em;
+  cursor: pointer;
+  user-select: none;
+  border: none;
+}
+
+.wizard-label:hover { 
+  background: #bbb; 
+}
+
+.wizard-input:checked + .wizard-label { 
+  background: #007bff; 
+  color: white; 
+}
+
+.wizard-input:checked + .wizard-label:hover { 
+  background: #0056b3; 
+}
+
+.nav-button {
+  font-size: 1.5em;
+  background: #333;
+  color: white;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-button:hover { 
+  background: #555; 
+}
+
+.nav-button:active { 
+  background: #777; 
+}
+
+.wizard-text {
+  width: 100%;
+  height: 100%;
+  font-size: 2em;
+  padding: 20px;
+  border: none;
+  outline: none;
+  resize: none;
+}
+</style>
+</head>
+<body>
+
+<div id="wizardOverlay">
+  <div id="wizardPanels" class="wizardPane">
+  </div>
+  <div id="wizardNavi">
+  </div>
+</div>
+
+<div style="padding: 20px;">
+  <button onclick="testWizard()">Test Wizard</button>
+  <div id="output"></div>
+</div>
+
+<script>
+const Wizard = (function() {
+  let container;
+  let panels;
+  let navi;
+  let schema;
+  let data;
+  let step;
+  let resolve;
+  let reject;
+  let screens = [];
+  function gridSizer(buttonCount, aspectRatio) {
+    let bestRows = 1;
+    let bestCols = buttonCount;
+    let bestSkinny = 0.0;
+    for (let rows = 1; rows <= buttonCount; rows++) {
+      const cols = Math.ceil(buttonCount / rows);
+      const width = 1.0 / cols;
+      const height = rows / aspectRatio;
+      const currentSkinny = Math.min(width, height);
+      if (currentSkinny > bestSkinny) {
+        bestSkinny = currentSkinny;
+        bestRows = rows;
+        bestCols = cols;
+      }
+    }
+    return {
+      rows: bestRows,
+      cols: bestCols
+    };
+  }
+  function refresh() {
+    const schemaKeys = Object.keys(schema);
+    if (step < 0) {
+      step = 0;
+    } else if (step >= schemaKeys.length) {
+      done();
+      return;
+    }
+    screens.forEach((screen, index) => {
+      if (index === step) {
+        screen.classList.add('active');
+      } else {
+        screen.classList.remove('active');
+      }
+    });
+  }
+  function init() {
+    container = document.getElementById('wizardOverlay');
+    panels = document.getElementById('wizardPanels');
+    panels.innerHTML = '';
+    navi = document.getElementById('wizardNavi');
+    navi.innerHTML = '';
+    [
+      {textContent: '⬅️', onclick: Wizard.back },
+      {textContent: '❌', onclick: Wizard.kill },
+      {textContent: '💾', onclick: Wizard.done },
+      {textContent: '➡️', onclick: Wizard.next }
+    ].forEach(config => {
+      const button = document.createElement('button');
+      Object.assign(button, config, { className: 'nav-button' });
+      navi.appendChild(button);
+    });
+  }
+  function build() {
+    if (!container) init();
+    screens = [];
+    const schemaKeys = Object.keys(schema);
+    schemaKeys.forEach((fieldName, index) => {
+      const fieldConfig = schema[fieldName];
+      const screen = document.createElement('div');
+      screen.className = 'wizard-screen';
+      buildScreenContent(screen, fieldName, fieldConfig, index);
+      panels.appendChild(screen);
+      screens.push(screen);
+    });
+  }
+  function buildScreenContent(screen, fieldName, fieldConfig, index) {
+    if (fieldConfig.type === 'text') {
+      screen.style.cssText = 'grid-template-columns:1fr;grid-template-rows:1fr';
+      const textarea = document.createElement('textarea');
+      textarea.className = 'wizard-text';
+      textarea.placeholder = `Description`;
+      textarea.oninput = () => grab(fieldName, textarea.value, fieldConfig);
+      screen.appendChild(textarea);
+    } else {
+      const options = fieldConfig.type === 'boolean' 
+        ? [fieldConfig.true, fieldConfig.false] 
+        : fieldConfig.options;
+      const grid = gridSizer(options.length, panels.offsetWidth / panels.offsetHeight);
+      screen.style.cssText = `grid-template-columns:repeat(${grid.cols},1fr);grid-template-rows:repeat(${grid.rows},1fr)`;
+      options.forEach((option, optionIndex) => {
+        const input = document.createElement('input');
+        input.type = fieldConfig.type === 'multiple' ? 'checkbox' : 'radio';
+        input.value = option;
+        input.className = 'wizard-input';
+        input.onchange = () => {
+          if (input.checked) {
+            grab(fieldName, option, fieldConfig);
+          }
+        };
+        const label = document.createElement('label');
+        label.className = 'wizard-label';
+        label.textContent = option;
+        screen.appendChild(input);
+        screen.appendChild(label);
+      });
+    }
+  }
+  function grab(fieldName, value, fieldConfig) {
+    if (value === undefined) return;
+    
+    if (fieldConfig.type === 'text') {
+      data[fieldName] = value;
+    } else if (fieldConfig.type === 'multiple') {
+      data[fieldName] = data[fieldName] || [];
+      if (data[fieldName].includes(value)) {
+        data[fieldName] = data[fieldName].filter(x => x !== value);
+      } else {
+        data[fieldName].push(value);
+      }
+    } else if (fieldConfig.type === 'boolean') {
+      data[fieldName] = value === fieldConfig.true;
+      next(); // Auto-advance for boolean
+    } else if (fieldConfig.type === 'single') {
+      data[fieldName] = value;
+      next(); // Auto-advance for single
+    }
+  }
+  function record() {
+    data = {};
+    step = 0;
+    schema = getSchema();
+    init();
+    build();
+    container.style.display = 'flex';
+    return new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+      refresh();
+    });
+  }
+  function kill() {
+    container.style.display = 'none';
+    if (reject) {
+      reject(new Error('WIZARD_KILLED'));
+    }
+  }
+  function done() {
+    container.style.display = 'none';
+    if (resolve) {
+      resolve(data);
+    }
+  }
+  function back() {
+    step--;
+    refresh();
+  }
+  function next() {
+    step++;
+    refresh();
+  }
+  return {
+    record,
+    kill,
+    done,
+    back,
+    next
+  };
+})();
+async function testWizard() {
+  const output = document.getElementById('output');
+  output.innerHTML = '<div>Starting wizard...</div>';
+  try {
+    const result = await Wizard.record();
+    output.innerHTML += `<div>Wizard completed: ${JSON.stringify(result, null, 2)}</div>`;
+  } catch (error) {
+    if (error.message === 'WIZARD_KILLED') {
+      output.innerHTML += '<div>Wizard was killed by user</div>';
+    } else {
+      output.innerHTML += `<div>Wizard error: ${error.message}</div>`;
+    }
+  }
+}
+function getSchema() {
+  const testSchema = {
+    "location": {"type": "single", "options": ["Bando", "Donnes"]},
+    "sublocation": {"type": "single", "options": ["A", "B", "C", "D", "E", "F", "G", "H", "R", "L"]},
+    "category": {"type": "multiple", "options": ["w", "f", "c", "v", "t", "i", "e", "h", "b", "s"]},
+    "retrievalFlag": {"type": "boolean", "true": "GET", "false": "LEAVE"},
+    "disposalFlag": {"type": "boolean", "true": "TOSS", "false": "KEEP"},
+    "selectionFlag": {"type": "boolean", "true": "SELECT", "false": "UNSELECT"},
+    "note": {"type": "text"}
+  };
+  return testSchema;
+}
+function nextMode() {
+  currentMode = (currentMode + 1) % modes.length;
+  Wizard.kill();
+}
+</script>
+</body>
+</html>
