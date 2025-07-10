@@ -184,7 +184,7 @@ const Wizard = (function() {
         input.className = 'wizard-input';
         input.name = `field-${index}`;
         const id = `field-${index}-${fieldName}-${optionIndex}`;
-        input.id = inputId;
+        input.id = id;
         if (fieldConfig.type === 'multiple') {
           input.type = 'checkbox';
           //if (data[fieldName] && data[fieldName].includes(option)) {input.checked = true;}
