@@ -183,6 +183,8 @@ const Wizard = (function() {
         input.value = option;
         input.className = 'wizard-input';
         input.name = `field-${index}`;
+        const id = `field-${index}-${fieldName}-${optionIndex}`;
+        input.id = inputId;
         if (fieldConfig.type === 'multiple') {
           input.type = 'checkbox';
           //if (data[fieldName] && data[fieldName].includes(option)) {input.checked = true;}
@@ -194,12 +196,12 @@ const Wizard = (function() {
           input.type = 'radio';
           //if (data[fieldName] === option) {input.checked = true;}
           input.onchange = () => {
-            data[fieldName] = input.value;
+            data[fieldName] = option;
             next();
           };
         }
         const label = document.createElement('label');
-        //label.htmlFor = inputId;
+        label.htmlFor = id;
         label.className = 'wizard-label';
         label.textContent = option;
         screen.appendChild(input);
