@@ -182,6 +182,7 @@ const Wizard = (function() {
         const input = document.createElement('input');
         input.value = option;
         input.className = 'wizard-input';
+        input.name = `field-${index}`;
         if (fieldConfig.type === 'multiple') {
           input.type = 'checkbox';
           //if (data[fieldName] && data[fieldName].includes(option)) {input.checked = true;}
@@ -252,7 +253,7 @@ async function testWizard() {
   output.innerHTML = '<div>Starting wizard...</div>';
   try {
     const result = await Wizard.record();
-    output.innerHTML = `<pre>Wizard completed:\n${JSON.stringify(result, null, 2)}</pre>`;
+    output.innerHTML += `<div>Wizard completed: ${JSON.stringify(result, null, 2)}</div>`;
   } catch (error) {
     if (error.message === 'WIZARD_KILLED') {
       output.innerHTML += '<div>Wizard was killed by user</div>';
