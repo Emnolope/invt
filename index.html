@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Inventory App</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    .mode { display: none; }
+    .mode.active { display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }
+    #modeBtn { position: fixed; top: 10px; right: 10px; z-index: 1000; padding: 10px; }
+    #camera { width: 100vw; height: 100vh; object-fit: cover; cursor: pointer; }
+    .placeholder { display: flex; align-items: center; justify-content: center; font-size: 3em; background: #333; color: white; }
+    #gallery { display: grid; grid-template-columns: 50vw 50vw; margin: 0; padding: 0; }
+    .gallery-item { width: 50vw; height: 50vw; margin: 0; padding: 0; border: none; object-fit: cover; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="mode0" class="mode">
+      <video id="camera" autoplay playsinline onclick="rapidFireCapture()"></video>
+    </div>
+    <div id="mode1" class="mode placeholder">SLOW PICTURE MODE</div>
+    <div id="mode2" class="mode">
+      <div id="gallery"></div>
+    </div>
+    <div id="mode3" class="mode placeholder">TABLE VIEW</div>
+    <div id="mode4" class="mode placeholder">
+      <button onclick="pickFolder()">Pick Folder</button>
+      <button onclick="testParsing()">Test Parsing</button>
+      <div id="output"></div>
+    </div>
+  </div>
+  <button id="modeBtn" onclick="nextMode()"></button>
+  <script>
+// GLOBAL STATE
+let dirHandle;
+////// I/O OPERATIONS //////
+async function listFiles() {
+  const files = [];
+  for await (const [name, handle] of dirHandle.entries()) {
+    if (handle.kind === 'file') files.push(name);
+  }
+  return files;
+}
+async function readFile(filename) {
+  const handle = await dirHandle.getFileHandle(filename);
+  return await handle.getFile();
+}
+async function writeFile(filename, data) {
+  const handle = await dirHandle.getFileHandle(filename, {create: true});
+  const writer = await handle.createWritable();
+  await writer.write(data);
+  await writer.close();
+}
+async function deleteFile(filename) {
+  await dirHandle.removeEntry(filename);
+}
+////// CAMERA //////
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video: true});
+    document.getElementById('camera').srcObject = stream;
+  } catch(e) { log('Camera failed:', e); }
+}
+function capturePhoto() {
+  const canvas = document.createElement('canvas');
+  const video = document.getElementById('camera');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  return canvas.toDataURL('image/jpeg');
+}
+////// HIGH LEVEL //////
+async function saveInventoryItem(metadata, imageData) {
+  if (!dirHandle) {
+    log('No folder selected');
+    return;
+  }
+  const filename = await generateFilename(metadata);
+  const response = await fetch(imageData);
+  const blob = await response.blob();
+  await writeFile(filename, blob);
+  log(`📸 Saved: ${filename}`);
+  return filename;
+}
+async function rapidFireCapture() {
+  const imageData = capturePhoto();
+  const metadata = await createEmptyMetadata();
+  await saveInventoryItem(metadata, imageData);
+}
+////// UI OPERATIONS //////
+const modes = ['📸', '🐌', '🖼️', '📊', '⚙️'];
+let currentMode = 0;
+function nextMode() {
+  currentMode = (currentMode + 1) % modes.length;
+  render();
+}
+function render() {
+  document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
+  document.getElementById(`mode${currentMode}`).classList.add('active');
+  document.getElementById('modeBtn').textContent = modes[currentMode];
+  
+  if (currentMode === 2) {
+    renderGallery();
+  }
+}
+function log(msg) {
+  document.getElementById('output').innerHTML += `<div>${msg}</div>`;
+}
+////// DYNAMIC SCHEMA SYSTEM //////
+let schema = null;
+
+async function loadSchema() {
+  if (!schema) {
+    const response = await fetch('./schema.json');
+    schema = await response.json();
+  }
+  return schema;
+}
+
+function generateUUID() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hour = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const sec = String(now.getSeconds()).padStart(2, '0');
+  const mil = String(now.getMilliseconds()).padStart(3, '0');
+  return `${year}${month}${day}${hour}${min}${sec}${mil}`;
+}
+
+async function parseFilename(filename) {
+  const currentSchema = await loadSchema();
+  const [name, ext] = filename.split('.');
+  const parts = name.split('_');
+  
+  // Bulletproof: handle any number of parts
+  if (parts.length < 1) return { original: filename, valid: false };
+  
+  const result = {
+    ext: ext || 'jpg',
+    original: filename,
+    valid: true,
+    timestamp: parts[parts.length - 1] // Timestamp is always last
+  };
+  
+  const fieldNames = Object.keys(currentSchema);
+  const nonFreetextFields = fieldNames.filter(f => currentSchema[f].type !== 'freetext');
+  const freetextFields = fieldNames.filter(f => currentSchema[f].type === 'freetext');
+  
+  let partIndex = 0;
+  
+  // Parse non-freetext fields first
+  for (const fieldName of nonFreetextFields) {
+    const fieldConfig = currentSchema[fieldName];
+    let rawValue = '';
+    
+    if (partIndex < parts.length - 1) { // -1 because timestamp is last
+      rawValue = parts[partIndex];
+      partIndex++;
+    }
+    
+    // Handle empty/underscore values as undefined
+    if (!rawValue || rawValue.trim() === '') {
+      result[fieldName] = undefined;
+      continue;
+    }
+    
+    // Process value based on schema type
+    if (fieldConfig.type === 'boolean') {
+      if (rawValue === fieldConfig.true) {
+        result[fieldName] = true;
+      } else if (rawValue === fieldConfig.false) {
+        result[fieldName] = false;
+      } else {
+        result[fieldName] = undefined; // Invalid/unknown boolean value
+      }
+    } else if (fieldConfig.type === 'multiple') {
+      // Split concatenated options into array, handle empty gracefully
+      if (rawValue && rawValue.trim()) {
+        result[fieldName] = rawValue.split('');
+      } else {
+        result[fieldName] = undefined; // Empty multiple field
+      }
+    } else {
+      // single type - keep as string, empty becomes undefined
+      result[fieldName] = rawValue || undefined;
+    }
+  }
+  
+  // Parse freetext fields (consume remaining parts except timestamp)
+  for (const fieldName of freetextFields) {
+    const textParts = [];
+    while (partIndex < parts.length - 1) { // -1 because timestamp is last
+      const part = parts[partIndex];
+      if (part && part.trim()) { // Skip empty parts in freetext
+        textParts.push(part);
+      }
+      partIndex++;
+    }
+    
+    if (textParts.length > 0) {
+      result[fieldName] = textParts.join(' ');
+    } else {
+      result[fieldName] = undefined; // Empty freetext
+    }
+  }
+  
+  return result;
+}
+
+async function generateFilename(metadata) {
+  const currentSchema = await loadSchema();
+  const fieldNames = Object.keys(currentSchema);
+  const parts = [];
+  
+  // Add all schema fields first
+  for (const fieldName of fieldNames) {
+    const fieldConfig = currentSchema[fieldName];
+    const value = metadata[fieldName];
+    
+    // Handle undefined as underscore (rapid fire mode)
+    if (value === undefined) {
+      parts.push('');
+      continue;
+    }
+    
+    if (fieldConfig.type === 'boolean') {
+      if (value === true) {
+        parts.push(fieldConfig.true);
+      } else if (value === false) {
+        parts.push(fieldConfig.false);
+      } else {
+        parts.push(''); // Invalid/undefined boolean
+      }
+    } else if (fieldConfig.type === 'multiple') {
+      // Join array back into concatenated string
+      if (Array.isArray(value) && value.length > 0) {
+        parts.push(value.join(''));
+      } else {
+        parts.push(''); // Empty or invalid array
+      }
+    } else if (fieldConfig.type === 'freetext') {
+      // Keep spaces as spaces, empty if no value
+      if (value && value.trim()) {
+        parts.push(value.trim());
+      } else {
+        parts.push(''); // Empty freetext
+      }
+    } else {
+      // single type - keep as is or empty
+      parts.push(value || '');
+    }
+  }
+  
+  // Add timestamp last
+  parts.push(metadata.timestamp);
+  
+  return `${parts.join('_')}.${metadata.ext || 'jpg'}`;
+}
+
+async function createEmptyMetadata() {
+  const currentSchema = await loadSchema();
+  const metadata = {
+    timestamp: generateUUID(),
+    ext: 'jpg'
+  };
+  
+  // Rapid fire mode: everything is undefined (underscore placeholders)
+  for (const fieldName of Object.keys(currentSchema)) {
+    metadata[fieldName] = undefined;
+  }
+  
+  return metadata;
+}
+
+function transformMetadata(metadata, rule) {
+  if (rule === 'reverse' && metadata.note) {
+    return { ...metadata, note: metadata.note.split('').reverse().join('') };
+  }
+  return metadata;
+}
+async function pickFolder() {
+  try {
+    dirHandle = await window.showDirectoryPicker();
+    log('📁 Folder selected');
+    const inventory = await loadInventory();
+    log(`📄 Found ${inventory.length} valid items`);
+  } catch (e) {
+    log(`❌ ${e.message}`);
+  }
+}
+
+async function testParsing() {
+  // Test 1: Full data
+  const testFilename = "Bando_F_wfe_GET_KEEP_UNSELECT_be careful with this item it is alive_20250626053144131.jpg";
+  log('🧪 Testing filename parsing...');
+  log(`Test file: ${testFilename}`);
+  
+  const parsed = await parseFilename(testFilename);
+  log('Parsed result:');
+  for (const [key, value] of Object.entries(parsed)) {
+    if (Array.isArray(value)) {
+      log(`  ${key}: [${value.join(', ')}]`);
+    } else {
+      log(`  ${key}: ${typeof value} "${value}"`);
+    }
+  }
+  
+  if (parsed.valid) {
+    const regenerated = await generateFilename(parsed);
+    log(`Regenerated: ${regenerated}`);
+    log(`Match: ${regenerated === testFilename ? '✅' : '❌'}`);
+  }
+  
+  log('---');
+  
+  // Test 2: Rapid fire mode (all underscores)
+  log('🔥 Testing rapid fire mode...');
+  const rapidMeta = await createEmptyMetadata();
+  const rapidFilename = await generateFilename(rapidMeta);
+  log(`Rapid fire filename: ${rapidFilename}`);
+  
+  const rapidParsed = await parseFilename(rapidFilename);
+  log('Rapid parsed:');
+  for (const [key, value] of Object.entries(rapidParsed)) {
+    log(`  ${key}: ${typeof value} "${value}"`);
+  }
+}
+async function loadInventory() {
+  const filenames = await listFiles();
+  const inventory = [];
+  for (const filename of filenames) {
+    const metadata = await parseFilename(filename);
+    inventory.push(metadata);
+  }
+  return inventory;
+}
+async function renderGallery() {
+  if (!dirHandle) {
+    log('No dirHandle');
+    return;
+  }
+  const gallery = document.getElementById('gallery');
+  if (!gallery) {
+    log('No gallery element');
+    return;
+  }
+  gallery.innerHTML = '';
+  log('Loading inventory...');
+  const inventory = await loadInventory();
+  log('Inventory:', inventory);
+  const validItems = inventory;//.filter(item => item.valid);
+  log('Valid items:', validItems);
+  for (const item of validItems) {
+    log('Processing item:', item);
+    try {
+      const file = await readFile(item.original);
+      log('File loaded:', file);
+      const imageUrl = URL.createObjectURL(file);
+      log('Image URL created:', imageUrl);
+      
+      const img = document.createElement('img');
+      img.src = imageUrl;
+      img.className = 'gallery-item';
+      gallery.appendChild(img);
+      log('Image added to gallery');
+    } catch (e) {
+      log('Error processing item:', item, e);
+    }
+  }
+}
+async function updateInventoryItem(oldFilename, transformation) {
+  const oldMetadata = await parseFilename(oldFilename);
+  const newMetadata = transformMetadata(oldMetadata, transformation);
+  const newFilename = await generateFilename(newMetadata);
+  const fileData = await readFile(oldFilename);
+  await writeFile(newFilename, fileData);
+  await deleteFile(oldFilename);
+  return { old: oldFilename, new: newFilename };
+}
+window.onload = function init() {
+  render();
+  startCamera();
+}
+  </script>
+</body>
+</html>
