@@ -169,7 +169,7 @@ const Wizard = (function() {
       screens.push(screen);
     });
   }
-  function buildScreenContent(screen, fieldName, fieldConfig, index) {
+  function buildScreenContent(screen, fieldName, fieldConfig, fieldIndex) {
     if (fieldConfig.type === 'text') {
       screen.style.cssText = 'grid-template-columns:1fr;grid-template-rows:1fr';
       const textarea = document.createElement('textarea');
