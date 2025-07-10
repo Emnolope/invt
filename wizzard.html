@@ -2,8 +2,18 @@
 <html>
 <head>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { height: 100vh; display: flex; flex-direction: column; font-family: Arial, sans-serif; }
+* { 
+  margin: 0; 
+  padding: 0; 
+  box-sizing: border-box; 
+}
+
+body { 
+  height: 100vh; 
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, -apple-system, sans-serif; 
+}
 #wizardOverlay {
   display: none;
   height: 100vh;
@@ -25,7 +35,7 @@ body { height: 100vh; display: flex; flex-direction: column; font-family: Arial,
 #wizardNavi {
   height: 80px;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 2px;
   padding: 2px;
   background: #000;
@@ -117,10 +127,7 @@ const Wizard = (function() {
         bestCols = cols;
       }
     }
-    return {
-      rows: bestRows,
-      cols: bestCols
-    };
+    return { rows: bestRows, cols: bestCols };
   }
   function refresh() {
     if (step < 0) {
@@ -164,7 +171,7 @@ const Wizard = (function() {
     });
   }
   function buildScreenContent(screen, index) {
-    const [fieldName, fieldConfig]=schema[index]
+    const [fieldName, fieldConfig] = schema[index];
     if (fieldConfig.type === 'text') {
       screen.style.cssText = 'grid-template-columns:1fr;grid-template-rows:1fr';
       const textarea = document.createElement('textarea');
@@ -172,11 +179,13 @@ const Wizard = (function() {
       textarea.placeholder = `Description`;
       textarea.value = data[fieldName] || '';
       textarea.oninput = () => {
-        data[fieldName]=textarea.value;
+        data[fieldName] = textarea.value;
       };
       screen.appendChild(textarea);
     } else {
-      const grid = gridSizer(fieldConfig.options.length, wizardPanels.offsetWidth / wizardPanels.offsetHeight);
+    const availableHeight = window.innerHeight - 80;
+    const availableWidth = window.innerWidth;
+      const grid = gridSizer(fieldConfig.options.length, availableWidth/availableHeight);
       screen.style.cssText = `grid-template-columns:repeat(${grid.cols},1fr);grid-template-rows:repeat(${grid.rows},1fr)`;
       fieldConfig.options.forEach((option, optionIndex) => {
         const input = document.createElement('input');
