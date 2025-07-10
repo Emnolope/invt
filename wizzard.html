@@ -43,15 +43,15 @@ body { height: 100vh; display: flex; flex-direction: column; font-family: Arial,
   user-select: none;
   border: none;
 }
-.wizard-label:hover { 
-  background: #bbb; 
+.wizard-label:hover {
+  background: #bbb;
 }
-.wizard-input:checked + .wizard-label { 
-  background: #007bff; 
-  color: white; 
+.wizard-input:checked + .wizard-label {
+  background: #007bff;
+  color: white;
 }
-.wizard-input:checked + .wizard-label:hover { 
-  background: #0056b3; 
+.wizard-input:checked + .wizard-label:hover {
+  background: #0056b3;
 }
 .nav-button {
   font-size: 1.5em;
@@ -64,11 +64,11 @@ body { height: 100vh; display: flex; flex-direction: column; font-family: Arial,
   align-items: center;
   justify-content: center;
 }
-.nav-button:hover { 
-  background: #555; 
+.nav-button:hover {
+  background: #555;
 }
-.nav-button:active { 
-  background: #777; 
+.nav-button:active {
+  background: #777;
 }
 .wizard-text {
   width: 100%;
@@ -94,15 +94,14 @@ body { height: 100vh; display: flex; flex-direction: column; font-family: Arial,
 </div>
 <script>
 const Wizard = (function() {
-  let container;
-  let panels;
+  let wizardOverlay;
+  let wizardPanels;
   let navi;
   let schema;
   let data;
   let step;
   let resolve;
   let reject;
-  let screens = [];
   function gridSizer(buttonCount, aspectRatio) {
     let bestRows = 1;
     let bestCols = buttonCount;
@@ -124,13 +123,13 @@ const Wizard = (function() {
     };
   }
   function refresh() {
-    const schemaKeys = Object.keys(schema);
     if (step < 0) {
       step = 0;
-    } else if (step >= schemaKeys.length) {
+    } else if (step >= schema.length) {
       done();
       return;
     }
+    const screens = Array.from(wizardPanels.children);
     screens.forEach((screen, index) => {
       if (index === step) {
         screen.classList.add('active');
@@ -140,9 +139,9 @@ const Wizard = (function() {
     });
   }
   function init() {
-    container = document.getElementById('wizardOverlay');
-    panels = document.getElementById('wizardPanels');
-    panels.innerHTML = '';
+    wizardOverlay = document.getElementById('wizardOverlay');
+    wizardPanels = document.getElementById('wizardPanels');
+    wizardPanels.innerHTML = '';
     navi = document.getElementById('wizardNavi');
     navi.innerHTML = '';
     [
@@ -157,41 +156,49 @@ const Wizard = (function() {
     });
   }
   function build() {
-    screens = [];
-    const schemaKeys = Object.keys(schema);
-    schemaKeys.forEach((fieldName, index) => {
-      const fieldConfig = schema[fieldName];
+    schema.forEach((_, index) => {
       const screen = document.createElement('div');
       screen.className = 'wizard-screen';
-      buildScreenContent(screen, fieldName, fieldConfig, index);
-      panels.appendChild(screen);
-      screens.push(screen);
+      buildScreenContent(screen, index);
+      wizardPanels.appendChild(screen);
     });
   }
-  function buildScreenContent(screen, fieldName, fieldConfig, fieldIndex) {
+  function buildScreenContent(screen, index) {
+    const [fieldName, fieldConfig]=schema[index]
     if (fieldConfig.type === 'text') {
       screen.style.cssText = 'grid-template-columns:1fr;grid-template-rows:1fr';
       const textarea = document.createElement('textarea');
       textarea.className = 'wizard-text';
       textarea.placeholder = `Description`;
-      textarea.oninput = () => grab(fieldName, textarea.value, fieldConfig);
+      textarea.value = data[fieldName] || '';
+      textarea.oninput = () => {
+        data[fieldName]=textarea.value;
+      };
       screen.appendChild(textarea);
     } else {
-      const options = fieldConfig.type === 'boolean' 
-        ? [fieldConfig.true, fieldConfig.false] 
-        : fieldConfig.options;
-      const grid = gridSizer(options.length, panels.offsetWidth / panels.offsetHeight);
+      const grid = gridSizer(fieldConfig.options.length, wizardPanels.offsetWidth / wizardPanels.offsetHeight);
       screen.style.cssText = `grid-template-columns:repeat(${grid.cols},1fr);grid-template-rows:repeat(${grid.rows},1fr)`;
-      options.forEach((option, optionIndex) => {
+      fieldConfig.options.forEach((option, optionIndex) => {
         const input = document.createElement('input');
-        input.type = fieldConfig.type === 'multiple' ? 'checkbox' : 'radio';
         input.value = option;
         input.className = 'wizard-input';
-        input.name = `field-${fieldIndex}`;
-        input.onchange = () => {
-          grab(fieldName, option, fieldConfig);
-        };
+        if (fieldConfig.type === 'multiple') {
+          input.type = 'checkbox';
+          //if (data[fieldName] && data[fieldName].includes(option)) {input.checked = true;}
+          input.onchange = () => {
+            const checkedInputs = screen.querySelectorAll('input[type="checkbox"]:checked');
+            data[fieldName] = Array.from(checkedInputs).map(inp => inp.value);
+          };
+        } else if (fieldConfig.type === 'single' || fieldConfig.type === 'boolean') {
+          input.type = 'radio';
+          //if (data[fieldName] === option) {input.checked = true;}
+          input.onchange = () => {
+            data[fieldName] = input.value;
+            next();
+          };
+        }
         const label = document.createElement('label');
+        //label.htmlFor = inputId;
         label.className = 'wizard-label';
         label.textContent = option;
         screen.appendChild(input);
@@ -199,33 +206,13 @@ const Wizard = (function() {
       });
     }
   }
-  function grab(fieldName, value, fieldConfig) {
-    if (value === undefined) return;
-    
-    if (fieldConfig.type === 'text') {
-      data[fieldName] = value;
-    } else if (fieldConfig.type === 'multiple') {
-      data[fieldName] = data[fieldName] || [];
-      if (data[fieldName].includes(value)) {
-        data[fieldName] = data[fieldName].filter(x => x !== value);
-      } else {
-        data[fieldName].push(value);
-      }
-    } else if (fieldConfig.type === 'boolean') {
-      data[fieldName] = value === fieldConfig.true;
-      next(); // Auto-advance for boolean
-    } else if (fieldConfig.type === 'single') {
-      data[fieldName] = value;
-      next(); // Auto-advance for single
-    }
-  }
   function record() {
     data = {};
     step = 0;
-    schema = getSchema();
+    schema = Object.entries(getSchema());
     init();
     build();
-    container.style.display = 'flex';
+    wizardOverlay.style.display = 'flex';
     return new Promise((res, rej) => {
       resolve = res;
       reject = rej;
@@ -233,13 +220,13 @@ const Wizard = (function() {
     });
   }
   function kill() {
-    container.style.display = 'none';
+    wizardOverlay.style.display = 'none';
     if (reject) {
       reject(new Error('WIZARD_KILLED'));
     }
   }
   function done() {
-    container.style.display = 'none';
+    wizardOverlay.style.display = 'none';
     if (resolve) {
       resolve(data);
     }
@@ -265,26 +252,26 @@ async function testWizard() {
   output.innerHTML = '<div>Starting wizard...</div>';
   try {
     const result = await Wizard.record();
-    output.innerHTML += `<div>Wizard completed: ${JSON.stringify(result, null, 2)}</div>`;
+    output.innerHTML = `<pre>Wizard completed:\n${JSON.stringify(result, null, 2)}</pre>`;
   } catch (error) {
     if (error.message === 'WIZARD_KILLED') {
       output.innerHTML += '<div>Wizard was killed by user</div>';
     } else {
+      console.error(error);
       output.innerHTML += `<div>Wizard error: ${error.message}</div>`;
     }
   }
 }
 function getSchema() {
-  const testSchema = {
+  return {
     "location": {"type": "single", "options": ["Bando", "Donnes"]},
     "sublocation": {"type": "single", "options": ["A", "B", "C", "D", "E", "F", "G", "H", "R", "L"]},
     "category": {"type": "multiple", "options": ["w", "f", "c", "v", "t", "i", "e", "h", "b", "s"]},
-    "retrievalFlag": {"type": "boolean", "true": "GET", "false": "LEAVE"},
-    "disposalFlag": {"type": "boolean", "true": "TOSS", "false": "KEEP"},
-    "selectionFlag": {"type": "boolean", "true": "SELECT", "false": "UNSELECT"},
+    "retrievalFlag": {"type": "boolean", "options": ["GET", "LEAVE"]},
+    "disposalFlag": {"type": "boolean", "options": ["TOSS", "KEEP"]},
+    "selectionFlag": {"type": "boolean", "options": ["SELECT", "UNSELECT"]},
     "note": {"type": "text"}
   };
-  return testSchema;
 }
 function nextMode() {
   currentMode = (currentMode + 1) % modes.length;
