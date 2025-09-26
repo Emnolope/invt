@@ -263,7 +263,7 @@ async function fileFolderButton() {
     log(`📄 Found ${Object.keys(inventory).length} valid items`);
     files = inventory;
   } catch (e) {
-    log("pickFolder: ", e);
+    log("pickFolder: ", e.message);
   }
 }
 /***** CAMERA *****/
