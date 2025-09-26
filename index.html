@@ -173,10 +173,6 @@ body {
 <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
 <script>eruda.init();</script>
   <script>
-// GLOBAL STATE
-let folder;
-let files = {};
-let thumbnailCache = {};
 /***** SYSTEM *****/
 function log(...msgs) {
   const message = msgs.map(msg => 
@@ -190,6 +186,7 @@ window.onload = async function init() {
 }
 log('script start');
 /***** LOW LEVEL I/O OPERATIONS *****/
+let folder;
 async function fileRead(filename) {
   const handle = await folder.getFileHandle(filename);
   return await handle.getFile();
@@ -238,59 +235,28 @@ async function fileListAll() {
   return files;
 }
 async function fileFind(uuid) {
-  try {
-    const expectedFilename = nameFromMetadata(files[uuid]?.metadata);
-    await folder.getFileHandle(expectedFilename);
-    return expectedFilename;
-  } catch (reconstructionError) {}
-  const allFilesInDirectory = await fileListAll();
-  const filesMatchingUUID = allFilesInDirectory.filter(filename => 
+  const reconstructedFilename = nameFromMetadata(files[uuid]?.metadata);
+  if (reconstructedFilename) {
+    const fileExists = await folder.getFileHandle(reconstructedFilename).catch(() => null);
+    if (fileExists) return reconstructedFilename;
+  }
+  const candidateFiles = (await fileListAll()).filter(filename => 
     filename.match(`_${uuid}\\.`)
   );
-  if (!filesMatchingUUID[0]) {
-    throw new Error(`UUID not found: ${uuid}`);
-  }
-  if (filesMatchingUUID[1]) {
-    log(`UUID conflict ${uuid}: ${filesMatchingUUID.join(', ')}`);
-  }
-  return filesMatchingUUID[0];
+  log(candidateFiles);}
+  if (!candidateFiles.length) return null;
+  if (candidateFiles.length === 1) return candidateFiles[0];
+  const filesWithTimestamps = await Promise.all(
+    candidateFiles.map(async filename => ({
+      filename,
+      lastModified: (await (await folder.getFileHandle(filename)).getFile()).lastModified
+    }))
+  );
+  return filesWithTimestamps
+    .sort((a, b) => b.lastModified - a.lastModified)[0]
+    .filename;
 }
-async function fileFolderButton() {
-  try {
-    folder = await window.showDirectoryPicker();
-    log('📁 Folder selected');
-    const inventory = await loadInventory();
-    log(`📄 Found ${Object.keys(inventory).length} valid items`);
-    files = inventory;
-  } catch (e) {
-    log("pickFolder: ", e.message);
-  }
-}
-/***** CAMERA *****/
-const Camera = {
-  stream: null,
-  video: null,
-  Ok() { 
-    return this.stream?.active && this.video?.videoWidth>0; 
-  },
-  async Init() {
-    this.stream = await navigator.mediaDevices.getUserMedia({video: true});
-    this.video = document.getElementById('camera');
-    this.video.srcObject = this.stream;
-    await new Promise(resolve => {
-      const check = () => this.video.videoWidth ? resolve() : setTimeout(check, 100);
-      check();
-    });
-  }
-};
-function cameraCapture(camera) {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  canvas.width = camera.video.videoWidth;
-  canvas.height = camera.video.videoHeight;
-  ctx.drawImage(camera.video, 0, 0);
-  return canvas.toDataURL('image/jpeg');
-}
+/***** UUID catalogue *****/
 /***** HIGH LEVEL *****/
 async function inventorySave(imageData, metadata) {
   const filename = nameFromMetadata(metadata);
@@ -328,6 +294,46 @@ function inventoryUpdate(filename, metadata) {
   const uuid = metadata.data.UUID;
   files[uuid] = { metadata, original: filename };
   return uuid;
+}
+let files = {};
+async function loadInventory() { 
+  const filenames = await fileListAll();
+  const inventory = {};
+  for (const filename of filenames) {
+    const metadata = nameToMetadata(filename);
+    if (metadata && metadata.data.UUID) {
+      inventory[metadata.data.UUID] = {
+        metadata: metadata,
+        original: filename //still here in case, but it's NOT GOOD to use it
+      };
+    }
+  }
+  return inventory;
+}
+/***** CAMERA *****/
+const Camera = {
+  stream: null,
+  video: null,
+  Ok() { 
+    return this.stream?.active && this.video?.videoWidth>0; 
+  },
+  async Init() {
+    this.stream = await navigator.mediaDevices.getUserMedia({video: true});
+    this.video = document.getElementById('camera');
+    this.video.srcObject = this.stream;
+    await new Promise(resolve => {
+      const check = () => this.video.videoWidth ? resolve() : setTimeout(check, 100);
+      check();
+    });
+  }
+};
+function cameraCapture(camera) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = camera.video.videoWidth;
+  canvas.height = camera.video.videoHeight;
+  ctx.drawImage(camera.video, 0, 0);
+  return canvas.toDataURL('image/jpeg');
 }
 /***** UI OPERATIONS *****/
 const modes = ['📸', '🐌', '🖼️', '📊', '⚙️'];
@@ -589,20 +595,8 @@ async function metadataEmpty() {
     log("metaEmpty: ", error);
   }
 }
-async function loadInventory() { 
-  const filenames = await fileListAll();
-  const inventory = {};
-  for (const filename of filenames) {
-    const metadata = nameToMetadata(filename);
-    if (metadata && metadata.data.UUID) {
-      inventory[metadata.data.UUID] = {
-        metadata: metadata,
-        original: filename //still here in case, but it's NOT GOOD to use it
-      };
-    }
-  }
-  return inventory;
-}
+/***** GALLERY *****/
+let thumbnailCache = {};
 const CACHENAME = 'cache.json';
 async function galleryLoad() {
   try {
