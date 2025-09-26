@@ -183,6 +183,7 @@ window.onload = async function init() {
   showRender();
   await Camera.Init();
 }
+log('script start');
 /***** LOW LEVEL I/O OPERATIONS *****/
 async function fileRead(filename) {
   const handle = await folder.getFileHandle(filename);
@@ -877,6 +878,7 @@ const Wizard = (function() {
   }
   return { record, kill, done, back, next };
 })();
+log('script end');
   </script>
 </body>
 </html>
