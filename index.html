@@ -178,8 +178,11 @@ let folder;
 let files = {};
 let thumbnailCache = {};
 /***** SYSTEM *****/
-function log(msg) {
-  document.getElementById('output').innerHTML += `<div>[${new Date().toISOString()}] ${msg}<`+`/div>`; //this little flourishm part prevents claude from freaking out.
+function log(...msgs) {
+  const message = msgs.map(msg => 
+    typeof msg === 'object' ? JSON.stringify(msg, null, 2) : String(msg)
+  ).join(' ');
+  document.getElementById('output').innerHTML += `<div>[${new Date().toISOString()}] ${message}</div>`;
 }
 window.onload = async function init() {
   showRender();
@@ -259,8 +262,8 @@ async function fileFolderButton() {
     const inventory = await loadInventory();
     log(`📄 Found ${Object.keys(inventory).length} valid items`);
     files = inventory;
-  } catch (error) {
-    log("pickFolder: ", error);
+  } catch (e) {
+    log("pickFolder: ", e);
   }
 }
 /***** CAMERA *****/
@@ -884,39 +887,3 @@ log('script end');
   </script>
 </body>
 </html>
-
-
-
-`````real-command
-Solve the problem in phases and start and end each phase with a set of 20 meditations. Before trying to solve the problem Try multiple times to elaborate in extensive detail on exactly what the problem is, making sure it is consistent with what's actually inside the prompt. There are some problems I'd like you to elaborate on AFTER DOING YOUR FUCKING MEDITATION EXERCISE, NOT BEFORE.
-MEDITATE,
-DEFINE PROBLEM,
-
-The grand majority of this code is AI and human generated slop. It's hasn't actually been tested in a browser for 50 commits. Which is fine. It's more of a spec sheet than it is source code. We're going to keep running unit tests and making sure the components work working on each one until the whole thing works. You're not testing individual functions we are testing components.
-
-ALREADY TESTED: (no need to retest)
-UUID()
-schemaToText()
-schemaFromText()
-nameToMetadata()
-nameFromMetadata()
-
-File I/O Layer Optimistic Path:
-User picks folder → fileWrite saves image with UUID filename → fileRead retrieves exact file → fileRename atomically changes filename → fileDelete removes unwanted files → fileFind locates file by UUID
-Schema System Optimistic Path:
-User loads valid schema.json → schemaFromText parses to object → UI builds from schema → user input validates against schema → schemaToText serializes back → file saves successfully
-Camera System Optimistic Path:
-Camera.Init() gets permission → video stream starts → user taps → cameraCapture gets frame → image converts to blob → file saves with metadata
-Inventory System Optimistic Path:
-User captures photo → metadata generates from schema → filename constructs from metadata → file saves → UUID indexes into files object → cache generates thumbnail → gallery displays
-UI System Optimistic Path:
-Mode switches work → wizard overlay shows → user fills fields → wizard returns values → overlay closes → data flows to storage
-`````
-
-
-
-`````procedure
-STEP 1: MEDITATE.
-STEP 2: WHICH COMPONENT TO MAKE A UNIT TEST FOR?
-STEP 3: WRITE UNIT TESTS FOR SINGLE COMPONENT.
-`````
