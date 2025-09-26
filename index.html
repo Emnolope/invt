@@ -3,14 +3,142 @@
 <head>
   <title>Inventory App</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    .mode { display: none; }
-    .mode.active { display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }
-    #modeBtn { position: fixed; top: 10px; right: 10px; z-index: 1000; padding: 10px; }
-    #camera { width: 100vw; height: 100vh; object-fit: cover; cursor: pointer; }
-    .placeholder { display: flex; align-items: center; justify-content: center; font-size: 3em; background: #333; color: white; }
-    #gallery { display: grid; grid-template-columns: 50vw 50vw; margin: 0; padding: 0; }
-    .gallery-item { width: 50vw; height: 50vw; margin: 0; padding: 0; border: none; object-fit: cover; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  height: 100vh;
+  font-family: system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+.mode {
+  display: none;
+}
+.mode.active {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+}
+#modeBtn {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  padding: 10px;
+}
+#camera {
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  cursor: pointer;
+}
+/* WHAT IS THIS, either needs renaming or deletion */
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3em;
+  background: #333;
+  color: white;
+}
+#gallery {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.gallery-item {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  cursor: pointer;
+}
+/***** WIZARD STYLING *****/
+#wizardOverlay {
+  position: fixed;
+  display: none;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  flex-direction: column;
+  z-index: 2;
+  background: #000;
+  padding: 2px;
+  gap: 2px;
+}
+.wizardPane {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+.wizard-screen {
+  display: none;
+  background: #000;
+  gap: 2px;
+}
+.wizard-screen.active {
+  display: grid;
+}
+#wizardNavi {
+  height: 80px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+}
+.wizard-input {
+  display: none;
+}
+.wizard-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ddd;
+  font-size: 2em;
+  cursor: pointer;
+  user-select: none;
+  border: none;
+}
+.wizard-label:hover {
+  background: #bbb;
+}
+.wizard-input:checked + .wizard-label {
+  background: #007bff;
+  color: white;
+}
+.wizard-input:checked + .wizard-label:hover {
+  background: #0056b3;
+}
+.nav-button {
+  font-size: 1.5em;
+  background: #333;
+  color: white;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-button:hover {
+  background: #555;
+}
+.nav-button:active {
+  background: #777;
+}
+.wizard-text {
+  width: 100%;
+  height: 100%;
+  font-size: 2em;
+  padding: 20px;
+  background: #fff;
+  border: none;
+  outline: none;
+  resize: none;
+}
   </style>
 </head>
 <body>
@@ -26,363 +154,727 @@
     <div id="mode4" class="mode placeholder">
       <button onclick="pickFolder()">Pick Folder</button>
       <button onclick="testParsing()">Test Parsing</button>
+      <div>
+        <textarea id="schemaTextarea" placeholder="Schema JSON"></textarea>
+        <button onclick="schemaLoadButton()">Load</button>
+        <button onclick="schemaLearnButton()">Learn</button>
+        <button onclick="schemaSaveButton()">Save</button>
+      </div>
       <div id="output"></div>
     </div>
   </div>
-  <button id="modeBtn" onclick="nextMode()"></button>
+  <button id="modeBtn" onclick="showNextMode()"></button>
+  <div id="wizardOverlay">
+    <div id="wizardPanels" class="wizardPane">
+    </div>
+    <div id="wizardNavi">
+    </div>
+  </div>
   <script>
 // GLOBAL STATE
-let dirHandle;
-////// I/O OPERATIONS //////
-async function listFiles() {
-  const files = [];
-  for await (const [name, handle] of dirHandle.entries()) {
-    if (handle.kind === 'file') files.push(name);
-  }
-  return files;
+let folder;
+let files = {};
+let thumbnailCache = {};
+/***** SYSTEM *****/
+function log(msg) {
+  document.getElementById('output').innerHTML += `<div>[${new Date().toISOString()}] ${msg}<`+`/div>`; //this little flourishm part prevents claude from freaking out.
 }
-async function readFile(filename) {
-  const handle = await dirHandle.getFileHandle(filename);
+window.onload = async function init() {
+  showRender();
+  await Camera.Init();
+}
+/***** LOW LEVEL I/O OPERATIONS *****/
+async function fileRead(filename) {
+  const handle = await folder.getFileHandle(filename);
   return await handle.getFile();
 }
-async function writeFile(filename, data) {
-  const handle = await dirHandle.getFileHandle(filename, {create: true});
+async function fileWrite(filename, data, allowOverwrite = false) {
+  if (!allowOverwrite) {
+    try {
+      await folder.getFileHandle(filename);
+      throw new Error(`Exists: ${filename}`);
+    } catch (e) {
+      if (e.name !== 'NotFoundError') throw e;
+    }
+  }
+  const handle = await folder.getFileHandle(filename, {create: true});
   const writer = await handle.createWritable();
   await writer.write(data);
   await writer.close();
 }
-async function deleteFile(filename) {
-  await dirHandle.removeEntry(filename);
+async function fileDelete(filename) {
+  await folder.removeEntry(filename);
 }
-////// CAMERA //////
-async function startCamera() {
+async function fileRename(oldPath, newPath) {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({video: true});
-    document.getElementById('camera').srcObject = stream;
-  } catch(e) { log('Camera failed:', e); }
+    await folder.getFileHandle(newPath);
+    throw new Error(`Destination exists: ${newPath}`);
+  } catch (error) {
+    if (error.name !== 'NotFoundError') throw error;
+  }
+  try {
+    const data = await fileRead(oldPath);
+    await fileWrite(newPath, data);
+  } catch (error) {
+    throw new Error(`Copy failed: ${error.message}`);
+  }
+  try {
+    await fileDelete(oldPath);
+  } catch (error) {
+    throw new Error(`Rename incomplete: ${newPath} created, ${oldPath} remains`);
+  }
 }
-function capturePhoto() {
+async function fileListAll() {
+  const files = [];
+  for await (const [name, handle] of folder.entries()) {
+    if (handle.kind === 'file') files.push(name);
+  }
+  return files;
+}
+async function fileFind(uuid) {
+  try {
+    const expectedFilename = nameFromMetadata(files[uuid]?.metadata);
+    await folder.getFileHandle(expectedFilename);
+    return expectedFilename;
+  } catch (reconstructionError) {}
+  const allFilesInDirectory = await fileListAll();
+  const filesMatchingUUID = allFilesInDirectory.filter(filename => 
+    filename.match(`_${uuid}\\.`)
+  );
+  if (!filesMatchingUUID[0]) {
+    throw new Error(`UUID not found: ${uuid}`);
+  }
+  if (filesMatchingUUID[1]) {
+    log(`UUID conflict ${uuid}: ${filesMatchingUUID.join(', ')}`);
+  }
+  return filesMatchingUUID[0];
+}
+/***** CAMERA *****/
+const Camera = {
+  stream: null,
+  video: null,
+  Ok() { 
+    return this.stream?.active && this.video?.videoWidth>0; 
+  },
+  async Init() {
+    this.stream = await navigator.mediaDevices.getUserMedia({video: true});
+    this.video = document.getElementById('camera');
+    this.video.srcObject = this.stream;
+    await new Promise(resolve => {
+      const check = () => this.video.videoWidth ? resolve() : setTimeout(check, 100);
+      check();
+    });
+  }
+};
+function cameraCapture(camera) {
   const canvas = document.createElement('canvas');
-  const video = document.getElementById('camera');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
+  const ctx = canvas.getContext('2d');
+  canvas.width = camera.video.videoWidth;
+  canvas.height = camera.video.videoHeight;
+  ctx.drawImage(camera.video, 0, 0);
   return canvas.toDataURL('image/jpeg');
 }
-////// HIGH LEVEL //////
-async function saveInventoryItem(metadata, imageData) {
-  if (!dirHandle) {
-    log('No folder selected');
-    return;
-  }
-  const filename = await generateFilename(metadata);
+/***** HIGH LEVEL *****/
+async function inventorySave(imageData, metadata) {
+  const filename = nameFromMetadata(metadata);
   const response = await fetch(imageData);
   const blob = await response.blob();
-  await writeFile(filename, blob);
-  log(`📸 Saved: ${filename}`);
+  await fileWrite(filename, blob);
   return filename;
 }
-async function rapidFireCapture() {
-  const imageData = capturePhoto();
-  const metadata = await createEmptyMetadata();
-  await saveInventoryItem(metadata, imageData);
+async function inventoryCapture(mode = 'rapid') {
+  try {
+    if (!Camera.Ok()) {
+      await Camera.Init();
+    }
+    const imageData = cameraCapture(Camera);
+    const metadata = mode === 'rapid' 
+      ? await metadataEmpty()
+      : {
+        data: { UUID: UUID(), ext: "jpg" },
+        values: await Wizard.record()
+      };
+    const filename = await inventorySave(imageData, metadata);
+    const uuid = inventoryUpdate(filename, metadata);
+    log(`📸 ${filename}`);
+    return uuid;
+  } catch (error) {
+    log(`Capture failed: ${error.message}`);
+    if (!Camera.stream?.active) {
+      Camera.stream = null;
+    }
+    return null;
+  }
 }
-////// UI OPERATIONS //////
+// NEEDS CHANGE: Atomic operation, metadata and filename must be in sync.
+function inventoryUpdate(filename, metadata) {
+  const uuid = metadata.data.UUID;
+  files[uuid] = { metadata, original: filename };
+  return uuid;
+}
+/***** UI OPERATIONS *****/
 const modes = ['📸', '🐌', '🖼️', '📊', '⚙️'];
 let currentMode = 0;
-function nextMode() {
+function showNextMode() {
   currentMode = (currentMode + 1) % modes.length;
-  render();
+  showRender();
+  Wizard.kill();
 }
-function render() {
+function showRender() {
   document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
   document.getElementById(`mode${currentMode}`).classList.add('active');
   document.getElementById('modeBtn').textContent = modes[currentMode];
-  
   if (currentMode === 2) {
-    renderGallery();
+    showRenderGallery();
   }
 }
-function log(msg) {
-  document.getElementById('output').innerHTML += `<div>${msg}</div>`;
+/***** DYNAMIC SCHEMA SYSTEM *****/
+// RESILIENT PARSING + DEFAULTS: schemaLoad should return default schema structure if all files fail, not empty string. schemaAnalyze should continue processing remaining files when individual nameToMetadata calls fail, logging specific problematic filenames. SchemaLearn should never throw - always produce usable schema.
+let schemaText = document.getElementById('schemaTextarea');
+schemaText.addEventListener('input', ()=>{schemaDirty=true;});
+let schemaFile = null;
+let schemaDirty = false;
+const SCHEMANAME = 'schema.json';
+// NEEDS CHANGE: Should use fileRead function for consistency. Should not throw - return default schema object if all loads fail.
+async function schemaLoad() { //should be using file functions
+  try {
+    const fileHandle = await folder.getFileHandle(SCHEMANAME);
+    const file = await fileHandle.getFile();
+    const content = await file.text();
+    schemaFile = fileName;
+    log(`📄 Loaded ${fileName}`);
+    return content;
+  } catch (e) {log(`schemaLoad: `, e);}
 }
-////// DYNAMIC SCHEMA SYSTEM //////
-let schema = null;
-
-async function loadSchema() {
-  if (!schema) {
-    const response = await fetch('./schema.json');
-    schema = await response.json();
+function schemaLoadButton() {
+  try {
+    schemaText.value=schemaLoad();
+    schemaDirty=false;
+  } catch(e) {log(e);}
+}
+async function schemaSave() {
+  try {
+    await fileWrite(schemaFile, schemaText.value, true);
+    log(`💾 Schema saved to ${schemaFile}`);
+  } catch (e) {
+    log(`Schema save failed: ${e}`);
+    throw e;
   }
-  return schema;
 }
-
-function generateUUID() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hour = String(now.getHours()).padStart(2, '0');
-  const min = String(now.getMinutes()).padStart(2, '0');
-  const sec = String(now.getSeconds()).padStart(2, '0');
-  const mil = String(now.getMilliseconds()).padStart(3, '0');
-  return `${year}${month}${day}${hour}${min}${sec}${mil}`;
+function schemaSaveButton() {
+  try {
+    schemaSave();
+    schemaDirty=false;
+  } catch(e) {log(e);}
 }
-
-async function parseFilename(filename) {
-  const currentSchema = await loadSchema();
-  const [name, ext] = filename.split('.');
-  const parts = name.split('_');
-  
-  // Bulletproof: handle any number of parts
-  if (parts.length < 1) return { original: filename, valid: false };
-  
-  const result = {
-    ext: ext || 'jpg',
-    original: filename,
-    valid: true,
-    timestamp: parts[parts.length - 1] // Timestamp is always last
-  };
-  
-  const fieldNames = Object.keys(currentSchema);
-  const nonFreetextFields = fieldNames.filter(f => currentSchema[f].type !== 'freetext');
-  const freetextFields = fieldNames.filter(f => currentSchema[f].type === 'freetext');
-  
-  let partIndex = 0;
-  
-  // Parse non-freetext fields first
-  for (const fieldName of nonFreetextFields) {
-    const fieldConfig = currentSchema[fieldName];
-    let rawValue = '';
-    
-    if (partIndex < parts.length - 1) { // -1 because timestamp is last
-      rawValue = parts[partIndex];
-      partIndex++;
-    }
-    
-    // Handle empty/underscore values as undefined
-    if (!rawValue || rawValue.trim() === '') {
-      result[fieldName] = undefined;
-      continue;
-    }
-    
-    // Process value based on schema type
-    if (fieldConfig.type === 'boolean') {
-      if (rawValue === fieldConfig.true) {
-        result[fieldName] = true;
-      } else if (rawValue === fieldConfig.false) {
-        result[fieldName] = false;
-      } else {
-        result[fieldName] = undefined; // Invalid/unknown boolean value
-      }
-    } else if (fieldConfig.type === 'multiple') {
-      // Split concatenated options into array, handle empty gracefully
-      if (rawValue && rawValue.trim()) {
-        result[fieldName] = rawValue.split('');
-      } else {
-        result[fieldName] = undefined; // Empty multiple field
-      }
+function schemaMergeOptions(fieldoptions1, fieldoptions2) {
+  const allOptions = [
+    ...(fieldoptions1 || []),
+    ...(fieldoptions2 || [])
+  ];
+  const uniqueOptions = allOptions.filter((option, index, self) => self.indexOf(option) === index);
+  return uniqueOptions;
+}
+const schemaHierarchy = { "single": 1, "multiple": 2, "text": 3 };
+function schemaFieldUpgrade(currentType, newType) {
+  return schemaHierarchy[newType] > schemaHierarchy[currentType] ? newType : currentType;
+}
+// wrap nameToMetadata in try catch to keep analysis running even with one bad file
+function analyzeFieldPattern(collection) {
+  const items = collection.filter(Boolean);
+  if (!items.length) {
+    return { type: 'single', options: [] };
+  }
+  let hasText = false;
+  let hasMultiple = false;
+  const tokens = new Set();
+  items.forEach(item => {
+    const segments = item.split(',');
+    const exceedsThreshold = segments.some(segment => segment.length > 26);
+    if (exceedsThreshold) {
+      hasText = true;
+      tokens.add(item);
+    } else if (segments.length > 1) {
+      hasMultiple = true;
+      segments.forEach(segment => tokens.add(segment));
     } else {
-      // single type - keep as string, empty becomes undefined
-      result[fieldName] = rawValue || undefined;
+      tokens.add(item);
     }
+  });
+  const fieldType = hasText ? 'text' : 
+                    hasMultiple ? 'multiple' : 
+                    'single';
+  const result = { type: fieldType };
+  if (fieldType !== 'text') {
+    result.options = [...tokens];
   }
-  
-  // Parse freetext fields (consume remaining parts except timestamp)
-  for (const fieldName of freetextFields) {
-    const textParts = [];
-    while (partIndex < parts.length - 1) { // -1 because timestamp is last
-      const part = parts[partIndex];
-      if (part && part.trim()) { // Skip empty parts in freetext
-        textParts.push(part);
-      }
-      partIndex++;
-    }
-    
-    if (textParts.length > 0) {
-      result[fieldName] = textParts.join(' ');
-    } else {
-      result[fieldName] = undefined; // Empty freetext
-    }
-  }
-  
   return result;
 }
-
-async function generateFilename(metadata) {
-  const currentSchema = await loadSchema();
-  const fieldNames = Object.keys(currentSchema);
-  const parts = [];
-  
-  // Add all schema fields first
-  for (const fieldName of fieldNames) {
-    const fieldConfig = currentSchema[fieldName];
-    const value = metadata[fieldName];
-    
-    // Handle undefined as underscore (rapid fire mode)
-    if (value === undefined) {
-      parts.push('');
-      continue;
+function schemaAnalyze(filenames) {
+  const imageFiles = filenames.filter(f => 
+    f.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)
+  );
+  const allMetadata = imageFiles
+    .map(filename => nameToMetadata(filename, null))
+    .filter(metadata => metadata !== null);
+  if (allMetadata.length === 0) return [];
+  const maxFields = Math.max(...allMetadata.map(m => m.values.length));
+  const fieldCollections = Array.from({ length: maxFields }, () => []);
+  allMetadata.forEach(metadata => {
+    metadata.values.forEach((valueArray, fieldIndex) => {
+      if (valueArray.length > 0 && valueArray[0]) {
+        fieldCollections[fieldIndex].push(valueArray[0]);
+      }
+    });
+  });
+  return fieldCollections.map((collection, index) => {
+    const pattern = analyzeFieldPattern(collection);
+    return {
+      name: `field${index}`,
+      type: pattern.type,
+      ...(pattern.type !== 'text' && { options: pattern.options })
+    };
+  });
+}
+function schemaFuse(schema1, schema2) {
+  if (!Array.isArray(schema1)) schema1 = [];
+  if (!Array.isArray(schema2)) schema2 = [];
+  const result = [];
+  const maxLength = Math.max(schema1.length, schema2.length);
+  for (let i = 0; i < maxLength; i++) {
+    const field1 = schema1[i];
+    const field2 = schema2[i];
+    if (field1 && field2) {
+      const mergedOptions = schemaMergeOptions(field1.options, field2.options);
+      const finalType = schemaFieldUpgrade(field1.type, field2.type);
+      result[i] = {
+        name: field1.name || field2.name,
+        type: finalType,
+        ...(mergedOptions && { options: mergedOptions })
+      };
+    } else if (field1) {
+      result[i] = { ...field1 };
+    } else if (field2) {
+      result[i] = { ...field2 };
     }
-    
-    if (fieldConfig.type === 'boolean') {
-      if (value === true) {
-        parts.push(fieldConfig.true);
-      } else if (value === false) {
-        parts.push(fieldConfig.false);
-      } else {
-        parts.push(''); // Invalid/undefined boolean
-      }
-    } else if (fieldConfig.type === 'multiple') {
-      // Join array back into concatenated string
-      if (Array.isArray(value) && value.length > 0) {
-        parts.push(value.join(''));
-      } else {
-        parts.push(''); // Empty or invalid array
-      }
-    } else if (fieldConfig.type === 'freetext') {
-      // Keep spaces as spaces, empty if no value
-      if (value && value.trim()) {
-        parts.push(value.trim());
-      } else {
-        parts.push(''); // Empty freetext
-      }
-    } else {
-      // single type - keep as is or empty
-      parts.push(value || '');
+  }
+  return result;
+}
+async function schemaLearn() {
+  try {
+    const fileList = await fileListAll();
+    if (fileList.length === 0) {
+      log('ℹ️ No files found for learning');
+      return;
     }
+    log(`🧠 Learning from ${fileList.length} files...`);
+    const learnedSchema = schemaAnalyze(fileList);
+    const currentSchema = schemaFromText(schemaText.value);
+    const fusedSchema = schemaFuse(currentSchema, learnedSchema);
+    schemaText.value = schemaToText(fusedSchema);
+    schemaDirty = true;
+    log('🎓 Schema learning complete');
+  } catch (error) {
+    log("schemaLearning: ", error);
   }
-  
-  // Add timestamp last
-  parts.push(metadata.timestamp);
-  
-  return `${parts.join('_')}.${metadata.ext || 'jpg'}`;
+}
+function schemaLearnButton() {
+  try {
+    schemaLearn();
+    schemaDirty=true;
+  } catch(e) {log(e);}
+}
+async function schemaInit() {
+  schemaText.value = await schemaLoad();
+  schemaDirty = false;
+  await schemaLearn();
+}
+// AI SLOP: NEEDS CHANGE: Should wrap both operations in try-catch and continue with defaults if either fails
+function schemaFromText(text) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    log("schemaFromText: ", error);
+    return [];
+  }
+}
+function schemaToText(schemaArray) {
+  try {
+    return JSON.stringify(schemaArray, null, 2);
+  } catch (error) {
+    log("schemaToText: ", error);
+    return '';
+  }
+}
+schemaGet = ()=>schemaFromText(schemaText.value);
+
+//<button onclick="schemaValidate()?log('✅ Schema is valid'):log('❌ Schema validation failed');">Learn</button>
+/***** FILENAME OPERATIONS *****/
+function UUID() {
+  const now = new Date();
+  const year = now.getFullYear();                             //4
+  const month = String(now.getMonth() + 1).padStart(2, '0');  //2
+  const day = String(now.getDate()).padStart(2, '0');         //2
+  const hour = String(now.getHours()).padStart(2, '0');       //2
+  const min = String(now.getMinutes()).padStart(2, '0');      //2
+  const sec = String(now.getSeconds()).padStart(2, '0');      //2
+  const mil = String(now.getMilliseconds()).padStart(3, '0'); //3
+  return `${year}${month}${day}${hour}${min}${sec}${mil}`;    //4+2+2+2+2+2+3 = 17
+}
+function nameToMetadata(filename, schema=schemaGet()) {
+  try {
+    const parts = filename.split('_');
+    const [uuid, ext] = parts.pop().split('.');
+    if (!/^\d{17}$/.test(uuid)) {
+      throw new Error("Bad UUID!");
+    }
+    const values = parts.map((part, index) => {
+      // Default fallback handles full/incomplete/invalid schema
+      if (schema?.[index]?.type === 'multiple') {
+        return part.split(',');
+      } else {  // 'single', 'text', or unknown/inferred
+        return [part];
+      }
+    });
+    return {
+      data: { UUID: uuid, ext: ext },
+      values: values
+    };
+  }
+  catch (error) {
+    console.error("nameToMetadata: ", error);
+    return null;
+  }
+}
+// AI SLOP: NEEDS CHANGE: Should never fail - return minimal metadata with single empty field if schema loading fails
+
+function nameFromMetadata(metadata) {
+  const parts = metadata.values.map(valueArray => valueArray.join(','));
+  return [...parts, metadata.data.UUID].join('_') + '.' + metadata.data.ext;
+}
+// Does this function even need to hold the same size? Leave values as empty array?
+async function metadataEmpty() {
+  try {
+    const schema = schemaGet();
+    const values = Array(schema.length).fill([]);
+    return {
+      data: {
+        UUID: UUID(),
+        ext: ""
+      },
+      values: values
+    };
+  } catch (error) {
+    log("metaEmpty: ", error);
+  }
 }
 
-async function createEmptyMetadata() {
-  const currentSchema = await loadSchema();
-  const metadata = {
-    timestamp: generateUUID(),
-    ext: 'jpg'
-  };
-  
-  // Rapid fire mode: everything is undefined (underscore placeholders)
-  for (const fieldName of Object.keys(currentSchema)) {
-    metadata[fieldName] = undefined;
-  }
-  
-  return metadata;
-}
-
-function transformMetadata(metadata, rule) {
-  if (rule === 'reverse' && metadata.note) {
-    return { ...metadata, note: metadata.note.split('').reverse().join('') };
-  }
-  return metadata;
-}
 async function pickFolder() {
   try {
-    dirHandle = await window.showDirectoryPicker();
+    folder = await window.showDirectoryPicker();
     log('📁 Folder selected');
     const inventory = await loadInventory();
-    log(`📄 Found ${inventory.length} valid items`);
-  } catch (e) {
-    log(`❌ ${e.message}`);
+    log(`📄 Found ${Object.keys(inventory).length} valid items`);
+    files = inventory;
+  } catch (error) {
+    log("pickFolder: ", error);
   }
 }
 
-async function testParsing() {
-  // Test 1: Full data
-  const testFilename = "Bando_F_wfe_GET_KEEP_UNSELECT_be careful with this item it is alive_20250626053144131.jpg";
-  log('🧪 Testing filename parsing...');
-  log(`Test file: ${testFilename}`);
-  
-  const parsed = await parseFilename(testFilename);
-  log('Parsed result:');
-  for (const [key, value] of Object.entries(parsed)) {
-    if (Array.isArray(value)) {
-      log(`  ${key}: [${value.join(', ')}]`);
-    } else {
-      log(`  ${key}: ${typeof value} "${value}"`);
-    }
-  }
-  
-  if (parsed.valid) {
-    const regenerated = await generateFilename(parsed);
-    log(`Regenerated: ${regenerated}`);
-    log(`Match: ${regenerated === testFilename ? '✅' : '❌'}`);
-  }
-  
-  log('---');
-  
-  // Test 2: Rapid fire mode (all underscores)
-  log('🔥 Testing rapid fire mode...');
-  const rapidMeta = await createEmptyMetadata();
-  const rapidFilename = await generateFilename(rapidMeta);
-  log(`Rapid fire filename: ${rapidFilename}`);
-  
-  const rapidParsed = await parseFilename(rapidFilename);
-  log('Rapid parsed:');
-  for (const [key, value] of Object.entries(rapidParsed)) {
-    log(`  ${key}: ${typeof value} "${value}"`);
-  }
-}
-async function loadInventory() {
-  const filenames = await listFiles();
-  const inventory = [];
+async function loadInventory() { 
+  const filenames = await fileListAll();
+  const inventory = {};
   for (const filename of filenames) {
-    const metadata = await parseFilename(filename);
-    inventory.push(metadata);
+    const metadata = nameToMetadata(filename);
+    if (metadata && metadata.data.UUID) {
+      inventory[metadata.data.UUID] = {
+        metadata: metadata,
+        original: filename //still here in case, but it's NOT GOOD to use it
+      };
+    }
   }
   return inventory;
 }
-async function renderGallery() {
-  if (!dirHandle) {
-    log('No dirHandle');
-    return;
+const CACHENAME = 'cache.json';
+async function galleryLoad() {
+  try {
+    const gallery = document.getElementById('gallery');
+    gallery.innerHTML = '';
+    await cacheLoad();
+    for (const uuid in files) {
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const thumbnailDataURL = await galleryThumbnailGet(uuid);
+      if (thumbnailDataURL) {
+        const galleryImg = galleryImageElementCreate(uuid, thumbnailDataURL);
+        gallery.appendChild(galleryImg);
+      }
+    }
+    await cacheSave();
+  } catch (error) {
+    log("galleryLoad: ", error);
   }
-  const gallery = document.getElementById('gallery');
-  if (!gallery) {
-    log('No gallery element');
-    return;
+}
+// prevent single image failure from breaking entire gallery
+async function cacheLoad() {
+  try {
+    const cacheFile = await fileRead(CACHENAME);
+    const cacheText = await cacheFile.text();
+    const cacheData = JSON.parse(cacheText);
+    for (const uuid in cacheData) {
+      if (files[uuid]) {
+        files[uuid].thumbnail = cacheData[uuid].thumbnail;
+      }
+    }
+    return cacheData;
+  } catch (error) {
+    log("cacheLoad: ", error);
+    return {};
   }
-  gallery.innerHTML = '';
-  log('Loading inventory...');
-  const inventory = await loadInventory();
-  log('Inventory:', inventory);
-  const validItems = inventory;//.filter(item => item.valid);
-  log('Valid items:', validItems);
-  for (const item of validItems) {
-    log('Processing item:', item);
-    try {
-      const file = await readFile(item.original);
-      log('File loaded:', file);
-      const imageUrl = URL.createObjectURL(file);
-      log('Image URL created:', imageUrl);
-      
-      const img = document.createElement('img');
-      img.src = imageUrl;
-      img.className = 'gallery-item';
-      gallery.appendChild(img);
-      log('Image added to gallery');
-    } catch (e) {
-      log('Error processing item:', item, e);
+}
+async function cacheSave() {
+  try {
+    const cacheData = {};
+    for (const uuid in files) {
+      if (files[uuid].thumbnail) {
+        cacheData[uuid] = {
+          thumbnail: files[uuid].thumbnail
+        };
+      }
+    }
+    const cacheJSON = JSON.stringify(cacheData);
+    const blob = new Blob([cacheJSON], {type: 'application/json'});
+    await fileWrite(CACHENAME, blob);
+  } catch (error) {
+    log("cacheSave: ", error);
+  }
+}
+// no error handling, let error fly
+async function galleryThumbnailGet(uuid) {
+  if (files[uuid] && files[uuid].thumbnail) {
+    return files[uuid].thumbnail; //use existing thumbnail
+  }
+  const filename = await fileFind(uuid);
+  if (!filename) {
+    log(`galleryThumbnailGet: ${uuid}`);
+    return null;
+  }
+  const file = await fileRead(filename);
+  const thumbnailDataURL = await galleryThumbnailCreate(file);
+  if (!files[uuid]) {
+    files[uuid] = {};
+  }
+  files[uuid].thumbnail = thumbnailDataURL;
+  return thumbnailDataURL;
+}
+async function galleryThumbnailCreate(file) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  const imgUrl = URL.createObjectURL(file);
+  return new Promise((resolve) => {
+    img.onload = () => {
+      URL.revokeObjectURL(imgUrl);
+      const size = 512;
+      canvas.width = size;
+      canvas.height = size;
+      ctx.drawImage(img, 0, 0, size, size);
+      const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+      resolve(dataURL);
+    };
+    img.src = imgUrl;
+  });
+}
+function galleryImageElementCreate(uuid, thumbnailDataURL) {
+  const galleryImg = document.createElement('img');
+  galleryImg.src = thumbnailDataURL;
+  galleryImg.className = 'gallery-item';
+  galleryImg.loading = 'lazy';
+  galleryImg.onclick = async () => {
+    const filename = await fileFind(uuid);
+    if (!filename) {
+      log(`Could not locate file for UUID: ${uuid}`);
+      return;
+    }
+    const file = await fileRead(filename);
+    const originalUrl = URL.createObjectURL(file);
+    const popup = window.open('', '_blank');
+    popup.document.write(`<img src="${originalUrl}" style="max-width:100%;max-height:100%;">`);
+  };
+  return galleryImg;
+}
+// DISCUSSION: How to make components more robust?
+RESILIENT INPUT + NON-BLOCKING: Wizard failures return empty metadata rather than throwing. Input validation warns but doesn't prevent progression. Build functions handle missing schema gracefully.
+/***** WIZARD OVERLAY *****/
+const Wizard = (function() {
+  let wizardOverlay;
+  let wizardPanels;
+  let navi;
+  let schema;
+  let values;
+  let step;
+  let resolve;
+  let reject;
+  function gridSizer(buttonCount, aspectRatio) {
+    let bestRows = 1;
+    let bestCols = buttonCount;
+    let bestSkinny = 0.0;
+    for (let rows = 1; rows <= buttonCount; rows++) {
+      const cols = Math.ceil(buttonCount / rows);
+      const width = aspectRatio / cols;
+      const height = 1.0 / rows;
+      const nowSkinny = Math.min(width, height);
+      if (nowSkinny > bestSkinny) {
+        bestSkinny = nowSkinny;
+        bestRows = rows;
+        bestCols = cols;
+      }
+    }
+    return { rows: bestRows, cols: bestCols };
+  }
+  function refresh() {
+    if (step < 0) {
+      step = 0;
+    } else if (step >= schema.length) {
+      done();
+      return;
+    }
+    const screens = Array.from(wizardPanels.children);
+    screens.forEach((screen, index) => {
+      if (index === step) {
+        screen.classList.add('active');
+      } else {
+        screen.classList.remove('active');
+      }
+    });
+  }
+  function init() {
+    wizardOverlay = document.getElementById('wizardOverlay');
+    wizardPanels = document.getElementById('wizardPanels');
+    wizardPanels.innerHTML = '';
+    navi = document.getElementById('wizardNavi');
+    navi.innerHTML = '';
+    [
+      {textContent: '⬅️', onclick: back},
+      {textContent: '❌', onclick: kill},
+      {textContent: '💾', onclick: done},
+      {textContent: '➡️', onclick: next}
+    ].forEach(config => {
+      const button = document.createElement('button');
+      Object.assign(button, config, { className: 'nav-button' });
+      navi.appendChild(button);
+    });
+  }
+  function build() {
+    schema.forEach((_, index) => {
+      const screen = document.createElement('div');
+      screen.className = 'wizard-screen';
+      buildScreenContent(screen, index);
+      wizardPanels.appendChild(screen);
+    });
+  }
+  // CHANGE?
+  function buildScreenContent(screen, index) {
+    const field = schema[index];
+    if (field.type === 'text') {
+      screen.style.cssText = 'grid-template-columns:1fr;grid-template-rows:1fr';
+      const textarea = document.createElement('textarea');
+      textarea.className = 'wizard-text';
+      textarea.placeholder = `Enter ${field.name}`;
+      textarea.value = values[index] ? values[index][0] : '';
+      textarea.oninput = () => {
+        values[index] = [textarea.value];
+      };
+      screen.appendChild(textarea);
+    } else {
+      const availableHeight = window.innerHeight - 80;
+      const availableWidth = window.innerWidth;
+      log(availableHeight);
+      log(availableWidth);
+      const grid = gridSizer(field.options.length, availableWidth/availableHeight);
+      screen.style.cssText = `grid-template-columns:repeat(${grid.cols},1fr);grid-template-rows:repeat(${grid.rows},1fr)`;
+      field.options.forEach((option, optionIndex) => {
+        const input = document.createElement('input');
+        input.value = option;
+        input.className = 'wizard-input';
+        input.name = `field-${index}`;
+        const id = `field-${index}-${field.name}-${optionIndex}`;
+        input.id = id;
+        if (field.type === 'multiple') {
+          input.type = 'checkbox';
+          //if (values[index] && values[index].includes(option)) {input.checked = true;}
+          input.onchange = () => {
+            const checkedInputs = screen.querySelectorAll('input[type="checkbox"]:checked');
+            values[index] = Array.from(checkedInputs).map(inp => inp.value);
+          };
+        } else if (field.type === 'single') {
+          input.type = 'radio';
+          //if (values[index] && values[index][0] === option) {input.checked = true;}
+          input.onchange = () => {
+            values[index] = [option];
+            next();
+          };
+        }
+        const label = document.createElement('label');
+        label.htmlFor = id;
+        label.className = 'wizard-label';
+        label.textContent = option;
+        screen.appendChild(input);
+        screen.appendChild(label);
+      });
     }
   }
-}
-async function updateInventoryItem(oldFilename, transformation) {
-  const oldMetadata = await parseFilename(oldFilename);
-  const newMetadata = transformMetadata(oldMetadata, transformation);
-  const newFilename = await generateFilename(newMetadata);
-  const fileData = await readFile(oldFilename);
-  await writeFile(newFilename, fileData);
-  await deleteFile(oldFilename);
-  return { old: oldFilename, new: newFilename };
-}
-window.onload = function init() {
-  render();
-  startCamera();
-}
+  function mergeMetadata(metadata1, metadata2) {
+    const mergedResult = { ...metadata1 , ...metadata2 };
+    mergedResult.data = {...metadata1.data, ...metadata2.data};
+    const isEmptyArray = x => Array.isArray(x) && x.length === 0;
+    const maxLength = Math.max(metadata1.values?.length ?? 0, metadata2.values?.length ?? 0)
+    mergedResult.values = Array.from({ length: maxLength }, (_, i) =>
+      isEmptyArray(metadata2?.values[i]||[]) ?
+        (isEmptyArray(metadata1?.values[i]||[]) ?
+          []
+          :
+         metadata1.values[i])
+        :
+        metadata2.values[i]
+    );
+    return mergedResult;
+  }
+  function record() {
+    values = [];
+    step = 0;
+    schema = schemaGet();
+    init();
+    build();
+    wizardOverlay.style.display = 'flex';
+    return new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+      refresh();
+    });
+  }
+  // DISCUSSION: If the wizard fails for some reason, should it return an empty metadata? Should the calling function save the image with empty metadata?
+  function kill() {
+    wizardOverlay.style.display = 'none';
+    if (reject) {
+      reject(new Error('WIZARD_KILLED'));
+    }
+  }
+  function done() {
+    wizardOverlay.style.display = 'none';
+    if (resolve) {
+      resolve(values);
+    }
+  }
+  function back() {
+    step--;
+    refresh();
+  }
+  function next() {
+    step++;
+    refresh();
+  }
+  return { record, kill, done, back, next };
+})();
   </script>
 </body>
 </html>
