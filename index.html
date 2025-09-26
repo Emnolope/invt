@@ -152,7 +152,7 @@ body {
     </div>
     <div id="mode3" class="mode placeholder">TABLE VIEW</div>
     <div id="mode4" class="mode placeholder">
-      <button onclick="pickFolder()">Pick Folder</button>
+      <button onclick="fileFolderButton()">Pick Folder</button>
       <button onclick="testParsing()">Test Parsing</button>
       <div>
         <textarea id="schemaTextarea" placeholder="Schema JSON"></textarea>
@@ -249,6 +249,17 @@ async function fileFind(uuid) {
   }
   return filesMatchingUUID[0];
 }
+async function fileFolderButton() {
+  try {
+    folder = await window.showDirectoryPicker();
+    log('📁 Folder selected');
+    const inventory = await loadInventory();
+    log(`📄 Found ${Object.keys(inventory).length} valid items`);
+    files = inventory;
+  } catch (error) {
+    log("pickFolder: ", error);
+  }
+}
 /***** CAMERA *****/
 const Camera = {
   stream: null,
@@ -336,15 +347,16 @@ let schemaFile = null;
 let schemaDirty = false;
 const SCHEMANAME = 'schema.json';
 // NEEDS CHANGE: Should use fileRead function for consistency. Should not throw - return default schema object if all loads fail.
-async function schemaLoad() { //should be using file functions
+async function schemaLoad() {
   try {
-    const fileHandle = await folder.getFileHandle(SCHEMANAME);
-    const file = await fileHandle.getFile();
+    const file = await fileRead(SCHEMANAME);
     const content = await file.text();
-    schemaFile = fileName;
-    log(`📄 Loaded ${fileName}`);
+    log(`📄 Loaded ${SCHEMANAME}`);
     return content;
-  } catch (e) {log(`schemaLoad: `, e);}
+  } catch (e) {
+    log(`schemaLoad: `, e);
+    return '[]';
+  }
 }
 function schemaLoadButton() {
   try {
@@ -489,25 +501,28 @@ async function schemaInit() {
   schemaDirty = false;
   await schemaLearn();
 }
-// AI SLOP: NEEDS CHANGE: Should wrap both operations in try-catch and continue with defaults if either fails
 function schemaFromText(text) {
   try {
-    return JSON.parse(text);
+    if (text == null) throw new Error(`Bit nothin`);
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : []; // ensure array
   } catch (error) {
-    log("schemaFromText: ", error);
+    console.log("schemaFromText error:", error);
     return [];
   }
 }
-function schemaToText(schemaArray) {
+function schemaToText(schema) {
   try {
+    if (schema == null) throw new Error(`Bit nothin`);
     return JSON.stringify(schemaArray, null, 2);
   } catch (error) {
-    log("schemaToText: ", error);
+    console.log("schemaToText error:", error);
     return '';
   }
 }
-schemaGet = ()=>schemaFromText(schemaText.value);
-
+function schemaGet() {
+  return schemaFromText(schemaText.value);
+}
 //<button onclick="schemaValidate()?log('✅ Schema is valid'):log('❌ Schema validation failed');">Learn</button>
 /***** FILENAME OPERATIONS *****/
 function UUID() {
@@ -568,19 +583,6 @@ async function metadataEmpty() {
     log("metaEmpty: ", error);
   }
 }
-
-async function pickFolder() {
-  try {
-    folder = await window.showDirectoryPicker();
-    log('📁 Folder selected');
-    const inventory = await loadInventory();
-    log(`📄 Found ${Object.keys(inventory).length} valid items`);
-    files = inventory;
-  } catch (error) {
-    log("pickFolder: ", error);
-  }
-}
-
 async function loadInventory() { 
   const filenames = await fileListAll();
   const inventory = {};
