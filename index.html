@@ -218,12 +218,14 @@ async function fileRename(oldPath, newPath) {
   try {
     const data = await fileRead(oldPath);
     await fileWrite(newPath, data);
-  } catch (error) {
-    throw new Error(`Copy failed: ${error.message}`);
+  } catch (e) {
+    log(`fileRename, copy fail: `, e.message);
+    throw new Error(`Copy failed: ${e.message}`);
   }
   try {
     await fileDelete(oldPath);
-  } catch (error) {
+  } catch (e) {
+    log(`fileRename, delete fail: `, e.message);
     throw new Error(`Rename incomplete: ${newPath} created, ${oldPath} remains`);
   }
 }
@@ -243,7 +245,7 @@ async function fileFind(uuid) {
   const candidateFiles = (await fileListAll()).filter(filename => 
     filename.match(`_${uuid}\\.`)
   );
-  log(candidateFiles);}
+  log(`fileFind: `, candidateFiles);
   if (!candidateFiles.length) return null;
   if (candidateFiles.length === 1) return candidateFiles[0];
   const filesWithTimestamps = await Promise.all(
@@ -281,8 +283,8 @@ async function inventoryCapture(mode = 'rapid') {
     const uuid = inventoryUpdate(filename, metadata);
     log(`📸 ${filename}`);
     return uuid;
-  } catch (error) {
-    log(`Capture failed: ${error.message}`);
+  } catch (e) {
+    log(`Capture failed: ${e.message}`);
     if (!Camera.stream?.active) {
       Camera.stream = null;
     }
@@ -366,7 +368,7 @@ async function schemaLoad() {
     log(`📄 Loaded ${SCHEMANAME}`);
     return content;
   } catch (e) {
-    log(`schemaLoad: `, e);
+    log(`schemaLoad: `, e.message);
     return '[]';
   }
 }
@@ -374,14 +376,14 @@ function schemaLoadButton() {
   try {
     schemaText.value=schemaLoad();
     schemaDirty=false;
-  } catch(e) {log(e);}
+  } catch(e) {log(e.message);}
 }
 async function schemaSave() {
   try {
     await fileWrite(schemaFile, schemaText.value, true);
     log(`💾 Schema saved to ${schemaFile}`);
   } catch (e) {
-    log(`Schema save failed: ${e}`);
+    log(`Schema save failed: ${e.message}`);
     throw e;
   }
 }
@@ -389,7 +391,7 @@ function schemaSaveButton() {
   try {
     schemaSave();
     schemaDirty=false;
-  } catch(e) {log(e);}
+  } catch(e) {log(e.message);}
 }
 function schemaMergeOptions(fieldoptions1, fieldoptions2) {
   const allOptions = [
@@ -485,28 +487,24 @@ function schemaFuse(schema1, schema2) {
   return result;
 }
 async function schemaLearn() {
-  try {
-    const fileList = await fileListAll();
-    if (fileList.length === 0) {
-      log('ℹ️ No files found for learning');
-      return;
-    }
-    log(`🧠 Learning from ${fileList.length} files...`);
-    const learnedSchema = schemaAnalyze(fileList);
-    const currentSchema = schemaFromText(schemaText.value);
-    const fusedSchema = schemaFuse(currentSchema, learnedSchema);
-    schemaText.value = schemaToText(fusedSchema);
-    schemaDirty = true;
-    log('🎓 Schema learning complete');
-  } catch (error) {
-    log("schemaLearning: ", error);
+  const fileList = await fileListAll();
+  if (fileList.length === 0) {
+    log('ℹ️ No files found for learning');
+    return;
   }
+  log(`🧠 Learning from ${fileList.length} files...`);
+  const learnedSchema = schemaAnalyze(fileList);
+  const currentSchema = schemaFromText(schemaText.value);
+  const fusedSchema = schemaFuse(currentSchema, learnedSchema);
+  schemaText.value = schemaToText(fusedSchema);
+  schemaDirty = true;
+  log('🎓 Schema learning complete');
 }
 function schemaLearnButton() {
   try {
     schemaLearn();
     schemaDirty=true;
-  } catch(e) {log(e);}
+  } catch(e) {log(`schemaLearnButton`, e.message);}
 }
 async function schemaInit() {
   schemaText.value = await schemaLoad();
@@ -518,8 +516,8 @@ function schemaFromText(text) {
     if (text == null) throw new Error(`Bit nothin`);
     const parsed = JSON.parse(text);
     return Array.isArray(parsed) ? parsed : []; // ensure array
-  } catch (error) {
-    console.log("schemaFromText error:", error);
+  } catch (e) {
+    log("schemaFromText error:", e.message);
     return [];
   }
 }
@@ -527,8 +525,8 @@ function schemaToText(schema) {
   try {
     if (schema == null) throw new Error(`Bit nothin`);
     return JSON.stringify(schemaArray, null, 2);
-  } catch (error) {
-    console.log("schemaToText error:", error);
+  } catch (e) {
+    log("schemaToText error:", e.message);
     return '';
   }
 }
@@ -568,8 +566,8 @@ function nameToMetadata(filename, schema=schemaGet()) {
       values: values
     };
   }
-  catch (error) {
-    console.error("nameToMetadata: ", error);
+  catch (e) {
+    log("nameToMetadata: ", e.message);
     return null;
   }
 }
@@ -591,8 +589,8 @@ async function metadataEmpty() {
       },
       values: values
     };
-  } catch (error) {
-    log("metaEmpty: ", error);
+  } catch (e) {
+    log("metadataEmpty: ", e.message);
   }
 }
 /***** GALLERY *****/
@@ -612,8 +610,8 @@ async function galleryLoad() {
       }
     }
     await cacheSave();
-  } catch (error) {
-    log("galleryLoad: ", error);
+  } catch (e) {
+    log("galleryLoad: ", e.message);
   }
 }
 // prevent single image failure from breaking entire gallery
@@ -628,8 +626,8 @@ async function cacheLoad() {
       }
     }
     return cacheData;
-  } catch (error) {
-    log("cacheLoad: ", error);
+  } catch (e) {
+    log("cacheLoad: ", e.message);
     return {};
   }
 }
@@ -646,8 +644,8 @@ async function cacheSave() {
     const cacheJSON = JSON.stringify(cacheData);
     const blob = new Blob([cacheJSON], {type: 'application/json'});
     await fileWrite(CACHENAME, blob);
-  } catch (error) {
-    log("cacheSave: ", error);
+  } catch (e) {
+    log("cacheSave: ", e.message);
   }
 }
 // no error handling, let error fly
@@ -694,7 +692,7 @@ function galleryImageElementCreate(uuid, thumbnailDataURL) {
   galleryImg.onclick = async () => {
     const filename = await fileFind(uuid);
     if (!filename) {
-      log(`Could not locate file for UUID: ${uuid}`);
+      log(`galleryImageElementCreate: ${uuid}`);
       return;
     }
     const file = await fileRead(filename);
