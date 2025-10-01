@@ -264,9 +264,16 @@ async function fileFind(uuid) {
     .sort((a, b) => b.lastModified - a.lastModified)[0]
     .filename;
 }
+async function fileFolderPick() {
+  log(`↘️fileFolderPick`);
+  folder = await window.showDirectoryPicker();
+}
+async function fileFolderPickButton() {
+  try {fileFolderPick();}
+  catch (e) {log("fileFolderPickButton: ", e.message);}
+}
 /***** UUID catalogue *****/
-/***** HIGH LEVEL *****/
-let files = {};
+let inventory = {};
 async function inventorySave(imageData, metadata) {
   log(`↘️inventorySave`);
   const filename = nameFromMetadata(metadata);
@@ -307,20 +314,25 @@ function inventoryUpdate(filename, metadata) {
   files[uuid] = { metadata, original: filename };
   return uuid;
 }
-async function loadInventory() {
-  log(`↘️loadInventory`);
+async function inventoryLoad() {
+  log(`↘️inventoryLoad`);
   const filenames = await fileListAll();
-  const inventory = {};
+  const files = {};
   for (const filename of filenames) {
     const metadata = nameToMetadata(filename);
     if (metadata && metadata.data.UUID) {
-      inventory[metadata.data.UUID] = {
+      files[metadata.data.UUID] = {
         metadata: metadata,
         original: filename //still here in case, but it's NOT GOOD to use it
       };
     }
   }
-  return inventory;
+  inventory = files;
+}
+function inventoryLoadButton() {
+  log(`↘️inventoryLoadButton`);
+  try {inventoryLoad();}
+  catch (e) {log(`inventoryLoadButton: `, e.message);}
 }
 /***** CAMERA *****/
 const Camera = {
@@ -389,10 +401,8 @@ async function schemaLoad() {
 }
 function schemaLoadButton() {
   log(`↘️schemaLoadButton`);
-  try {
-    schemaText.value=schemaLoad();
-    schemaDirty=false;
-  } catch(e) {log(e.message);}
+  try {schemaText.value=schemaLoad();schemaDirty=false;}
+  catch(e) {log(e.message);}
 }
 async function schemaSave() {
   log(`↘️schemaSave`);
@@ -406,10 +416,8 @@ async function schemaSave() {
 }
 function schemaSaveButton() {
   log(`↘️schemaSaveButton`);
-  try {
-    schemaSave();
-    schemaDirty=false;
-  } catch(e) {log(`❌ schemaSaveButton: `, e.message);}
+  try {schemaSave(); schemaDirty=false;}
+  catch(e) {log(`❌ schemaSaveButton: `, e.message);}
 }
 function schemaMergeOptions(fieldoptions1, fieldoptions2) {
   log(`↘️schemaMergeOptions`);
@@ -525,10 +533,8 @@ async function schemaLearn() {
 }
 function schemaLearnButton() {
   log(`↘️schemaLearnButton`);
-  try {
-    schemaLearn();
-    schemaDirty=true;
-  } catch(e) {log(`❌ schemaLearnButton`, e.message);}
+  try {schemaLearn(); schemaDirty=true;}
+  catch(e) {log(`❌ schemaLearnButton`, e.message);}
 }
 async function schemaInit() {
   log(`↘️schemaInit`);
@@ -602,7 +608,6 @@ function nameToMetadata(filename, schema=schemaGet()) {
   }
 }
 // AI SLOP: NEEDS CHANGE: Should never fail - return minimal metadata with single empty field if schema loading fails
-
 function nameFromMetadata(metadata) {
   log(`↘️nameFromMetadata`);
   const parts = metadata.values.map(valueArray => valueArray.join(','));
@@ -634,7 +639,7 @@ async function galleryLoad() {
     const gallery = document.getElementById('gallery');
     gallery.innerHTML = '';
     await cacheLoad();
-    for (const uuid in files) {
+    for (const uuid in inventory) {
       await new Promise(resolve => requestAnimationFrame(resolve));
       const thumbnailDataURL = await galleryThumbnailGet(uuid);
       if (thumbnailDataURL) {
@@ -655,8 +660,8 @@ async function cacheLoad() {
     const cacheText = await cacheFile.text();
     const cacheData = JSON.parse(cacheText);
     for (const uuid in cacheData) {
-      if (files[uuid]) {
-        files[uuid].thumbnail = cacheData[uuid].thumbnail;
+      if (inventory[uuid]) {
+        inventory[uuid].thumbnail = cacheData[uuid].thumbnail;
       }
     }
     return cacheData;
@@ -669,10 +674,10 @@ async function cacheSave() {
   log(`↘️cameraSave`);
   try {
     const cacheData = {};
-    for (const uuid in files) {
-      if (files[uuid].thumbnail) {
+    for (const uuid in inventory) {
+      if (inventory[uuid].thumbnail) {
         cacheData[uuid] = {
-          thumbnail: files[uuid].thumbnail
+          thumbnail: inventory[uuid].thumbnail
         };
       }
     }
@@ -686,8 +691,8 @@ async function cacheSave() {
 // no error handling, let error fly
 async function galleryThumbnailGet(uuid) {
   log(`↘️galleryThumbnailGet`);
-  if (files[uuid] && files[uuid].thumbnail) {
-    return files[uuid].thumbnail; //use existing thumbnail
+  if (inventory[uuid] && inventory[uuid].thumbnail) {
+    return inventory[uuid].thumbnail; //use existing thumbnail
   }
   const filename = await fileFind(uuid);
   if (!filename) {
@@ -696,10 +701,10 @@ async function galleryThumbnailGet(uuid) {
   }
   const file = await fileRead(filename);
   const thumbnailDataURL = await galleryThumbnailCreate(file);
-  if (!files[uuid]) {
-    files[uuid] = {};
+  if (!inventory[uuid]) {
+    inventory[uuid] = {};
   }
-  files[uuid].thumbnail = thumbnailDataURL;
+  inventory[uuid].thumbnail = thumbnailDataURL;
   return thumbnailDataURL;
 }
 async function galleryThumbnailCreate(file) {
