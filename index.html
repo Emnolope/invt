@@ -182,16 +182,18 @@ function log(...msgs) {
 }
 window.onload = async function init() {
   showRender();
-  await Camera.Init();
+  await Camera.init();
 }
 log('script start');
 /***** LOW LEVEL I/O OPERATIONS *****/
 let folder;
 async function fileRead(filename) {
+  log(`↘️fileRead`);
   const handle = await folder.getFileHandle(filename);
   return await handle.getFile();
 }
 async function fileWrite(filename, data, allowOverwrite = false) {
+  log(`↘️fileWrite`);
   if (!allowOverwrite) {
     try {
       await folder.getFileHandle(filename);
@@ -206,9 +208,11 @@ async function fileWrite(filename, data, allowOverwrite = false) {
   await writer.close();
 }
 async function fileDelete(filename) {
+  log(`↘️fileDelete`);
   await folder.removeEntry(filename);
 }
 async function fileRename(oldPath, newPath) {
+  log(`↘️fileRename`);
   try {
     await folder.getFileHandle(newPath);
     throw new Error(`Destination exists: ${newPath}`);
@@ -219,17 +223,18 @@ async function fileRename(oldPath, newPath) {
     const data = await fileRead(oldPath);
     await fileWrite(newPath, data);
   } catch (e) {
-    log(`fileRename, copy fail: `, e.message);
+    log(`❌ fileRename, copy fail: `, e.message);
     throw new Error(`Copy failed: ${e.message}`);
   }
   try {
     await fileDelete(oldPath);
   } catch (e) {
-    log(`fileRename, delete fail: `, e.message);
+    log(`❌ fileRename, delete fail: `, e.message);
     throw new Error(`Rename incomplete: ${newPath} created, ${oldPath} remains`);
   }
 }
 async function fileListAll() {
+  log(`↘️fileListAll`);
   const files = [];
   for await (const [name, handle] of folder.entries()) {
     if (handle.kind === 'file') files.push(name);
@@ -237,6 +242,7 @@ async function fileListAll() {
   return files;
 }
 async function fileFind(uuid) {
+  log(`↘️fileFind`);
   const reconstructedFilename = nameFromMetadata(files[uuid]?.metadata);
   if (reconstructedFilename) {
     const fileExists = await folder.getFileHandle(reconstructedFilename).catch(() => null);
@@ -260,7 +266,9 @@ async function fileFind(uuid) {
 }
 /***** UUID catalogue *****/
 /***** HIGH LEVEL *****/
+let files = {};
 async function inventorySave(imageData, metadata) {
+  log(`↘️inventorySave`);
   const filename = nameFromMetadata(metadata);
   const response = await fetch(imageData);
   const blob = await response.blob();
@@ -268,9 +276,10 @@ async function inventorySave(imageData, metadata) {
   return filename;
 }
 async function inventoryCapture(mode = 'rapid') {
+  log(`↘️inventoryCapture`);
   try {
     if (!Camera.Ok()) {
-      await Camera.Init();
+      await Camera.init();
     }
     const imageData = cameraCapture(Camera);
     const metadata = mode === 'rapid' 
@@ -284,7 +293,7 @@ async function inventoryCapture(mode = 'rapid') {
     log(`📸 ${filename}`);
     return uuid;
   } catch (e) {
-    log(`Capture failed: ${e.message}`);
+    log(`❌ Capture failed: ${e.message}`);
     if (!Camera.stream?.active) {
       Camera.stream = null;
     }
@@ -293,12 +302,13 @@ async function inventoryCapture(mode = 'rapid') {
 }
 // NEEDS CHANGE: Atomic operation, metadata and filename must be in sync.
 function inventoryUpdate(filename, metadata) {
+  log(`↘️inventoryUpdate`);
   const uuid = metadata.data.UUID;
   files[uuid] = { metadata, original: filename };
   return uuid;
 }
-let files = {};
-async function loadInventory() { 
+async function loadInventory() {
+  log(`↘️loadInventory`);
   const filenames = await fileListAll();
   const inventory = {};
   for (const filename of filenames) {
@@ -319,7 +329,8 @@ const Camera = {
   Ok() { 
     return this.stream?.active && this.video?.videoWidth>0; 
   },
-  async Init() {
+  async init() {
+    log(`↘️Camera.init()`);
     this.stream = await navigator.mediaDevices.getUserMedia({video: true});
     this.video = document.getElementById('camera');
     this.video.srcObject = this.stream;
@@ -330,6 +341,7 @@ const Camera = {
   }
 };
 function cameraCapture(camera) {
+  log(`↘️cameraCapture`);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   canvas.width = camera.video.videoWidth;
@@ -341,11 +353,13 @@ function cameraCapture(camera) {
 const modes = ['📸', '🐌', '🖼️', '📊', '⚙️'];
 let currentMode = 0;
 function showNextMode() {
+  log(`↘️showNextMode`);
   currentMode = (currentMode + 1) % modes.length;
   showRender();
   Wizard.kill();
 }
 function showRender() {
+  log(`↘️showRender`);
   document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
   document.getElementById(`mode${currentMode}`).classList.add('active');
   document.getElementById('modeBtn').textContent = modes[currentMode];
@@ -362,38 +376,43 @@ let schemaDirty = false;
 const SCHEMANAME = 'schema.json';
 // NEEDS CHANGE: Should use fileRead function for consistency. Should not throw - return default schema object if all loads fail.
 async function schemaLoad() {
+  log(`↘️schemaLoad`);
   try {
     const file = await fileRead(SCHEMANAME);
     const content = await file.text();
     log(`📄 Loaded ${SCHEMANAME}`);
     return content;
   } catch (e) {
-    log(`schemaLoad: `, e.message);
+    log(`❌ schemaLoad: `, e.message);
     return '[]';
   }
 }
 function schemaLoadButton() {
+  log(`↘️schemaLoadButton`);
   try {
     schemaText.value=schemaLoad();
     schemaDirty=false;
   } catch(e) {log(e.message);}
 }
 async function schemaSave() {
+  log(`↘️schemaSave`);
   try {
     await fileWrite(schemaFile, schemaText.value, true);
     log(`💾 Schema saved to ${schemaFile}`);
   } catch (e) {
-    log(`Schema save failed: ${e.message}`);
+    log(`❌ Schema save failed: ${e.message}`);
     throw e;
   }
 }
 function schemaSaveButton() {
+  log(`↘️schemaSaveButton`);
   try {
     schemaSave();
     schemaDirty=false;
-  } catch(e) {log(e.message);}
+  } catch(e) {log(`❌ schemaSaveButton: `, e.message);}
 }
 function schemaMergeOptions(fieldoptions1, fieldoptions2) {
+  log(`↘️schemaMergeOptions`);
   const allOptions = [
     ...(fieldoptions1 || []),
     ...(fieldoptions2 || [])
@@ -407,6 +426,7 @@ function schemaFieldUpgrade(currentType, newType) {
 }
 // wrap nameToMetadata in try catch to keep analysis running even with one bad file
 function analyzeFieldPattern(collection) {
+  log(`↘️analyzeFieldPattern`);
   const items = collection.filter(Boolean);
   if (!items.length) {
     return { type: 'single', options: [] };
@@ -437,6 +457,7 @@ function analyzeFieldPattern(collection) {
   return result;
 }
 function schemaAnalyze(filenames) {
+  log(`↘️schemaAnalyze`);
   const imageFiles = filenames.filter(f => 
     f.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)
   );
@@ -463,6 +484,7 @@ function schemaAnalyze(filenames) {
   });
 }
 function schemaFuse(schema1, schema2) {
+  log(`↘️schemaFuse`);
   if (!Array.isArray(schema1)) schema1 = [];
   if (!Array.isArray(schema2)) schema2 = [];
   const result = [];
@@ -487,6 +509,7 @@ function schemaFuse(schema1, schema2) {
   return result;
 }
 async function schemaLearn() {
+  log(`↘️schemaLearn`);
   const fileList = await fileListAll();
   if (fileList.length === 0) {
     log('ℹ️ No files found for learning');
@@ -501,41 +524,47 @@ async function schemaLearn() {
   log('🎓 Schema learning complete');
 }
 function schemaLearnButton() {
+  log(`↘️schemaLearnButton`);
   try {
     schemaLearn();
     schemaDirty=true;
-  } catch(e) {log(`schemaLearnButton`, e.message);}
+  } catch(e) {log(`❌ schemaLearnButton`, e.message);}
 }
 async function schemaInit() {
+  log(`↘️schemaInit`);
   schemaText.value = await schemaLoad();
   schemaDirty = false;
   await schemaLearn();
 }
 function schemaFromText(text) {
+  log(`↘️schemaFromText`);
   try {
     if (text == null) throw new Error(`Bit nothin`);
     const parsed = JSON.parse(text);
     return Array.isArray(parsed) ? parsed : []; // ensure array
   } catch (e) {
-    log("schemaFromText error:", e.message);
+    log("❌ schemaFromText:", e.message);
     return [];
   }
 }
 function schemaToText(schema) {
+  log(`↘️schemaToText`);
   try {
     if (schema == null) throw new Error(`Bit nothin`);
     return JSON.stringify(schemaArray, null, 2);
   } catch (e) {
-    log("schemaToText error:", e.message);
+    log("❌schemaToText:", e.message);
     return '';
   }
 }
 function schemaGet() {
+  log(`↘️schemaGet`);
   return schemaFromText(schemaText.value);
 }
 //<button onclick="schemaValidate()?log('✅ Schema is valid'):log('❌ Schema validation failed');">Learn</button>
 /***** FILENAME OPERATIONS *****/
 function UUID() {
+  log(`↘️UUID`);
   const now = new Date();
   const year = now.getFullYear();                             //4
   const month = String(now.getMonth() + 1).padStart(2, '0');  //2
@@ -547,6 +576,7 @@ function UUID() {
   return `${year}${month}${day}${hour}${min}${sec}${mil}`;    //4+2+2+2+2+2+3 = 17
 }
 function nameToMetadata(filename, schema=schemaGet()) {
+  log(`↘️nameToMetadata`);
   try {
     const parts = filename.split('_');
     const [uuid, ext] = parts.pop().split('.');
@@ -567,18 +597,20 @@ function nameToMetadata(filename, schema=schemaGet()) {
     };
   }
   catch (e) {
-    log("nameToMetadata: ", e.message);
+    log("❌ nameToMetadata: ", e.message);
     return null;
   }
 }
 // AI SLOP: NEEDS CHANGE: Should never fail - return minimal metadata with single empty field if schema loading fails
 
 function nameFromMetadata(metadata) {
+  log(`↘️nameFromMetadata`);
   const parts = metadata.values.map(valueArray => valueArray.join(','));
   return [...parts, metadata.data.UUID].join('_') + '.' + metadata.data.ext;
 }
 // Does this function even need to hold the same size? Leave values as empty array?
 async function metadataEmpty() {
+  log(`↘️metadataEmpty`);
   try {
     const schema = schemaGet();
     const values = Array(schema.length).fill([]);
@@ -590,13 +622,14 @@ async function metadataEmpty() {
       values: values
     };
   } catch (e) {
-    log("metadataEmpty: ", e.message);
+    log("❌ metadataEmpty: ", e.message);
   }
 }
 /***** GALLERY *****/
 let thumbnailCache = {};
 const CACHENAME = 'cache.json';
 async function galleryLoad() {
+  log(`↘️galleryLoad`);
   try {
     const gallery = document.getElementById('gallery');
     gallery.innerHTML = '';
@@ -611,11 +644,12 @@ async function galleryLoad() {
     }
     await cacheSave();
   } catch (e) {
-    log("galleryLoad: ", e.message);
+    log("❌ galleryLoad: ", e.message);
   }
 }
 // prevent single image failure from breaking entire gallery
 async function cacheLoad() {
+  log(`↘️cacheLoad`);
   try {
     const cacheFile = await fileRead(CACHENAME);
     const cacheText = await cacheFile.text();
@@ -627,11 +661,12 @@ async function cacheLoad() {
     }
     return cacheData;
   } catch (e) {
-    log("cacheLoad: ", e.message);
+    log("❌ cacheLoad: ", e.message);
     return {};
   }
 }
 async function cacheSave() {
+  log(`↘️cameraSave`);
   try {
     const cacheData = {};
     for (const uuid in files) {
@@ -645,11 +680,12 @@ async function cacheSave() {
     const blob = new Blob([cacheJSON], {type: 'application/json'});
     await fileWrite(CACHENAME, blob);
   } catch (e) {
-    log("cacheSave: ", e.message);
+    log("❌ cacheSave: ", e.message);
   }
 }
 // no error handling, let error fly
 async function galleryThumbnailGet(uuid) {
+  log(`↘️galleryThumbnailGet`);
   if (files[uuid] && files[uuid].thumbnail) {
     return files[uuid].thumbnail; //use existing thumbnail
   }
@@ -667,6 +703,7 @@ async function galleryThumbnailGet(uuid) {
   return thumbnailDataURL;
 }
 async function galleryThumbnailCreate(file) {
+  log(`↘️galleryThumbnailCreate`);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   const img = new Image();
@@ -685,6 +722,7 @@ async function galleryThumbnailCreate(file) {
   });
 }
 function galleryImageElementCreate(uuid, thumbnailDataURL) {
+  log(`↘️galleryImageElementCreate`);
   const galleryImg = document.createElement('img');
   galleryImg.src = thumbnailDataURL;
   galleryImg.className = 'gallery-item';
@@ -715,6 +753,7 @@ const Wizard = (function() {
   let resolve;
   let reject;
   function gridSizer(buttonCount, aspectRatio) {
+    log(`↘️Wizard.gridSizer`);
     let bestRows = 1;
     let bestCols = buttonCount;
     let bestSkinny = 0.0;
@@ -732,6 +771,7 @@ const Wizard = (function() {
     return { rows: bestRows, cols: bestCols };
   }
   function refresh() {
+    log(`↘️Wizard.refresh`);
     if (step < 0) {
       step = 0;
     } else if (step >= schema.length) {
@@ -748,6 +788,7 @@ const Wizard = (function() {
     });
   }
   function init() {
+    log(`↘️Wizard.init`);
     wizardOverlay = document.getElementById('wizardOverlay');
     wizardPanels = document.getElementById('wizardPanels');
     wizardPanels.innerHTML = '';
@@ -765,6 +806,7 @@ const Wizard = (function() {
     });
   }
   function build() {
+    log(`↘️Wizard.build`);
     schema.forEach((_, index) => {
       const screen = document.createElement('div');
       screen.className = 'wizard-screen';
@@ -774,6 +816,7 @@ const Wizard = (function() {
   }
   // CHANGE?
   function buildScreenContent(screen, index) {
+    log(`↘️Wizard.buildScreenContent`);
     const field = schema[index];
     if (field.type === 'text') {
       screen.style.cssText = 'grid-template-columns:1fr;grid-template-rows:1fr';
@@ -824,6 +867,7 @@ const Wizard = (function() {
     }
   }
   function mergeMetadata(metadata1, metadata2) {
+    log(`↘️mergeMetadata`);
     const mergedResult = { ...metadata1 , ...metadata2 };
     mergedResult.data = {...metadata1.data, ...metadata2.data};
     const isEmptyArray = x => Array.isArray(x) && x.length === 0;
@@ -840,6 +884,7 @@ const Wizard = (function() {
     return mergedResult;
   }
   function record() {
+    log(`↘️Wizard.record`);
     values = [];
     step = 0;
     schema = schemaGet();
@@ -854,22 +899,26 @@ const Wizard = (function() {
   }
   // DISCUSSION: If the wizard fails for some reason, should it return an empty metadata? Should the calling function save the image with empty metadata?
   function kill() {
+    log(`↘️Wizard.kill`);
     wizardOverlay.style.display = 'none';
     if (reject) {
       reject(new Error('WIZARD_KILLED'));
     }
   }
   function done() {
+    log(`↘️Wizard.done`);
     wizardOverlay.style.display = 'none';
     if (resolve) {
       resolve(values);
     }
   }
   function back() {
+    log(`↘️Wizard.back`);
     step--;
     refresh();
   }
   function next() {
+    log(`↘️Wizard.next`);
     step++;
     refresh();
   }
