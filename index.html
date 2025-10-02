@@ -384,22 +384,29 @@ function showRender() {
 /***** DYNAMIC SCHEMA SYSTEM *****/
 // RESILIENT PARSING + DEFAULTS: schemaLoad should return default schema structure if all files fail, not empty string. schemaAnalyze should continue processing remaining files when individual nameToMetadata calls fail, logging specific problematic filenames. SchemaLearn should never throw - always produce usable schema.
 let schemaText = document.getElementById('schemaTextarea');
+schemaText.value = '[]';
 schemaText.addEventListener('input', ()=>{schemaDirty=true;});
 let schemaFile = null;
 let schemaDirty = false;
 const SCHEMANAME = 'schema.json';
-// NEEDS CHANGE: Should use fileRead function for consistency. Should not throw - return default schema object if all loads fail.
+function schemaFromText(text) {
+  log(`↘️schemaFromText`);
+  const parsed = JSON.parse(text);
+}
+function schemaToText(schema) {
+  log(`↘️schemaToText`);
+  return JSON.stringify(schema, null, 2);
+}
+function schemaGet() {
+  log(`↘️schemaGet`);
+  return schemaFromText(schemaText.value);
+}
 async function schemaLoad() {
   log(`↘️schemaLoad`);
-  try {
-    const file = await fileRead(SCHEMANAME);
-    const content = await file.text();
-    log(`📄 Loaded ${SCHEMANAME}`);
-    return content;
-  } catch (e) {
-    log(`❌ schemaLoad: `, e.message);
-    return '[]';
-  }
+  const file = await fileRead(SCHEMANAME);
+  const content = await file.text();
+  log(`📄 Loaded ${SCHEMANAME}`);
+  return content;
 }
 function schemaLoadButton() {
   log(`↘️schemaLoadButton`);
@@ -408,13 +415,8 @@ function schemaLoadButton() {
 }
 async function schemaSave() {
   log(`↘️schemaSave`);
-  try {
-    await fileWrite(schemaFile, schemaText.value, true);
-    log(`💾 Schema saved to ${schemaFile}`);
-  } catch (e) {
-    log(`❌ Schema save failed: ${e.message}`);
-    throw e;
-  }
+  await fileWrite(schemaFile, schemaText.value, true);
+  log(`💾 Schema saved to ${schemaFile}`);
 }
 function schemaSaveButton() {
   log(`↘️schemaSaveButton`);
@@ -543,31 +545,6 @@ async function schemaInit() {
   schemaText.value = await schemaLoad();
   schemaDirty = false;
   await schemaLearn();
-}
-function schemaFromText(text) {
-  log(`↘️schemaFromText`);
-  try {
-    if (text == null) throw new Error(`Bit nothin`);
-    const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : []; // ensure array
-  } catch (e) {
-    log("❌ schemaFromText:", e.message);
-    return [];
-  }
-}
-function schemaToText(schema) {
-  log(`↘️schemaToText`);
-  try {
-    if (schema == null) throw new Error(`Bit nothin`);
-    return JSON.stringify(schemaArray, null, 2);
-  } catch (e) {
-    log("❌schemaToText:", e.message);
-    return '';
-  }
-}
-function schemaGet() {
-  log(`↘️schemaGet`);
-  return schemaFromText(schemaText.value);
 }
 //<button onclick="schemaValidate()?log('✅ Schema is valid'):log('❌ Schema validation failed');">Learn</button>
 /***** FILENAME OPERATIONS *****/
