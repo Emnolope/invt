@@ -160,7 +160,7 @@ body {
         <button onclick="schemaLearnButton()">schemaLearn</button>
         <button onclick="schemaSaveButton()">schemaSave</button>
       </div>
-      <div id="output"></div>
+      <textarea id="output" readonly style="width: 100%; font-family: monospace; font-size: 12px; overflow-y: auto;"></textarea>
     </div>
   </div>
   <button id="modeBtn" onclick="showNextMode()"></button>
@@ -178,7 +178,9 @@ function log(...msgs) {
   const message = msgs.map(msg => 
     typeof msg === 'object' ? JSON.stringify(msg, null, 2) : String(msg)
   ).join(' ');
-  document.getElementById('output').innerHTML += `<div>[${new Date().toISOString()}] ${message}</div>`;
+  const outputBox = document.getElementById('output');
+  outputBox.value += `[${new Date().toISOString()}] ${message}\n`;
+  outputBox.scrollTop = outputBox.scrollHeight;
 }
 window.onload = async function init() {
   showRender();
