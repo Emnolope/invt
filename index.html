@@ -160,7 +160,7 @@ body {
         <button onclick="schemaLearnButton()">schemaLearn</button>
         <button onclick="schemaSaveButton()">schemaSave</button>
       </div>
-      <textarea id="output" readonly style="width: 100%; font-family: monospace; font-size: 12px; overflow-y: auto;"></textarea>
+      <div id="output"></div>
     </div>
   </div>
   <button id="modeBtn" onclick="showNextMode()"></button>
@@ -178,9 +178,7 @@ function log(...msgs) {
   const message = msgs.map(msg => 
     typeof msg === 'object' ? JSON.stringify(msg, null, 2) : String(msg)
   ).join(' ');
-  const outputBox = document.getElementById('output');
-  outputBox.value += `[${new Date().toISOString()}] ${message}\n`;
-  outputBox.scrollTop = outputBox.scrollHeight;
+  document.getElementById('output').innerHTML += `<div>[${new Date().toISOString()}] ${message}</div>`;
 }
 window.onload = async function init() {
   showRender();
@@ -225,13 +223,13 @@ async function fileRename(oldPath, newPath) {
     const data = await fileRead(oldPath);
     await fileWrite(newPath, data);
   } catch (e) {
-    log(`❌ fileRename, copy fail: `, e.message);
+    log(`❌ fileRename, copy fail: `, ...arguments, e.message);
     throw new Error(`Copy failed: ${e.message}`);
   }
   try {
     await fileDelete(oldPath);
   } catch (e) {
-    log(`❌ fileRename, delete fail: `, e.message);
+    log(`❌ fileRename, delete fail: `, ...arguments, e.message);
     throw new Error(`Rename incomplete: ${newPath} created, ${oldPath} remains`);
   }
 }
@@ -302,7 +300,7 @@ async function inventoryCapture(mode = 'rapid') {
     log(`📸 ${filename}`);
     return uuid;
   } catch (e) {
-    log(`❌ Capture failed: ${e.message}`);
+    log(`❌ inventoryCapture: `, ...arguments, e.message);
     if (!Camera.stream?.active) {
       Camera.stream = null;
     }
@@ -384,29 +382,22 @@ function showRender() {
 /***** DYNAMIC SCHEMA SYSTEM *****/
 // RESILIENT PARSING + DEFAULTS: schemaLoad should return default schema structure if all files fail, not empty string. schemaAnalyze should continue processing remaining files when individual nameToMetadata calls fail, logging specific problematic filenames. SchemaLearn should never throw - always produce usable schema.
 let schemaText = document.getElementById('schemaTextarea');
-schemaText.value = '[]';
 schemaText.addEventListener('input', ()=>{schemaDirty=true;});
 let schemaFile = null;
 let schemaDirty = false;
 const SCHEMANAME = 'schema.json';
-function schemaFromText(text) {
-  log(`↘️schemaFromText`);
-  const parsed = JSON.parse(text);
-}
-function schemaToText(schema) {
-  log(`↘️schemaToText`);
-  return JSON.stringify(schema, null, 2);
-}
-function schemaGet() {
-  log(`↘️schemaGet`);
-  return schemaFromText(schemaText.value);
-}
+// NEEDS CHANGE: Should use fileRead function for consistency. Should not throw - return default schema object if all loads fail.
 async function schemaLoad() {
   log(`↘️schemaLoad`);
-  const file = await fileRead(SCHEMANAME);
-  const content = await file.text();
-  log(`📄 Loaded ${SCHEMANAME}`);
-  return content;
+  try {
+    const file = await fileRead(SCHEMANAME);
+    const content = await file.text();
+    log(`📄 Loaded ${SCHEMANAME}`);
+    return content;
+  } catch (e) {
+    log(`❌ schemaLoad: `, ...arguments, e.message);
+    return '[]';
+  }
 }
 function schemaLoadButton() {
   log(`↘️schemaLoadButton`);
@@ -421,7 +412,7 @@ async function schemaSave() {
 function schemaSaveButton() {
   log(`↘️schemaSaveButton`);
   try {schemaSave(); schemaDirty=false;}
-  catch(e) {log(`❌ schemaSaveButton: `, e.message);}
+  catch(e) {log(`❌ schemaSaveButton: `, ...arguments, e.message);}
 }
 function schemaMergeOptions(fieldoptions1, fieldoptions2) {
   log(`↘️schemaMergeOptions`);
@@ -538,13 +529,38 @@ async function schemaLearn() {
 function schemaLearnButton() {
   log(`↘️schemaLearnButton`);
   try {schemaLearn(); schemaDirty=true;}
-  catch(e) {log(`❌ schemaLearnButton`, e.message);}
+  catch(e) {log(`❌ schemaLearnButton`, ...arguments, e.message);}
 }
 async function schemaInit() {
   log(`↘️schemaInit`);
   schemaText.value = await schemaLoad();
   schemaDirty = false;
   await schemaLearn();
+}
+function schemaFromText(text) {
+  log(`↘️schemaFromText`);
+  try {
+    if (text == null) throw new Error(`Bit nothin`);
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : []; // ensure array
+  } catch (e) {
+    log(`❌ schemaFromText:`, ...arguments, e.message);
+    return [];
+  }
+}
+function schemaToText(schema) {
+  log(`↘️schemaToText`);
+  try {
+    if (schema == null) throw new Error(`Bit nothin`);
+    return JSON.stringify(schemaArray, null, 2);
+  } catch (e) {
+    log("❌schemaToText:", ...arguments, e.message);
+    return '';
+  }
+}
+function schemaGet() {
+  log(`↘️schemaGet`);
+  return schemaFromText(schemaText.value);
 }
 //<button onclick="schemaValidate()?log('✅ Schema is valid'):log('❌ Schema validation failed');">Learn</button>
 /***** FILENAME OPERATIONS *****/
@@ -582,7 +598,7 @@ function nameToMetadata(filename, schema=schemaGet()) {
     };
   }
   catch (e) {
-    log("❌ nameToMetadata: ", e.message);
+    log(`❌ nameToMetadata: `, ...arguments, e.message);
     return null;
   }
 }
@@ -606,7 +622,7 @@ async function metadataEmpty() {
       values: values
     };
   } catch (e) {
-    log("❌ metadataEmpty: ", e.message);
+    log(`❌ metadataEmpty: `, ...arguments, e.message);
   }
 }
 /***** GALLERY *****/
@@ -628,7 +644,7 @@ async function galleryLoad() {
     }
     await cacheSave();
   } catch (e) {
-    log("❌ galleryLoad: ", e.message);
+    log(`❌ galleryLoad: `, ...arguments, e.message);
   }
 }
 // prevent single image failure from breaking entire gallery
@@ -645,7 +661,7 @@ async function cacheLoad() {
     }
     return cacheData;
   } catch (e) {
-    log("❌ cacheLoad: ", e.message);
+    log(`❌ cacheLoad: `, ...arguments, e.message);
     return {};
   }
 }
@@ -664,7 +680,7 @@ async function cacheSave() {
     const blob = new Blob([cacheJSON], {type: 'application/json'});
     await fileWrite(CACHENAME, blob);
   } catch (e) {
-    log("❌ cacheSave: ", e.message);
+    log(`❌ cacheSave: `, ...arguments, e.message);
   }
 }
 // no error handling, let error fly
