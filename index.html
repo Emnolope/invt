@@ -160,7 +160,7 @@ body {
         <button onclick="schemaLearnButton()">schemaLearn</button>
         <button onclick="schemaSaveButton()">schemaSave</button>
       </div>
-      <div id="output"></div>
+      <textarea id="output" readonly style="width: 100%; font-family: monospace; font-size: 12px; overflow-y: auto;"></textarea>
     </div>
   </div>
   <button id="modeBtn" onclick="showNextMode()"></button>
@@ -178,7 +178,9 @@ function log(...msgs) {
   const message = msgs.map(msg => 
     typeof msg === 'object' ? JSON.stringify(msg, null, 2) : String(msg)
   ).join(' ');
-  document.getElementById('output').innerHTML += `<div>[${new Date().toISOString()}] ${message}</div>`;
+  const outputBox = document.getElementById('output');
+  outputBox.value += `[${new Date().toISOString()}] ${message}\n`;
+  outputBox.scrollTop = outputBox.scrollHeight;
 }
 window.onload = async function init() {
   showRender();
@@ -187,6 +189,16 @@ window.onload = async function init() {
 log('script start');
 /***** LOW LEVEL I/O OPERATIONS *****/
 let folder;
+async function fileCheck(filename) {
+  try {
+    await folder.getFileHandle(filename);
+    return true;
+  }
+  catch (e) {
+    if (e.name === 'NotFoundError') return false;
+    throw e;
+  }
+}
 async function fileRead(filename) {
   log(`↘️fileRead`);
   const handle = await folder.getFileHandle(filename);
@@ -194,13 +206,8 @@ async function fileRead(filename) {
 }
 async function fileWrite(filename, data, allowOverwrite = false) {
   log(`↘️fileWrite`);
-  if (!allowOverwrite) {
-    try {
-      await folder.getFileHandle(filename);
-      throw new Error(`Exists: ${filename}`);
-    } catch (e) {
-      if (e.name !== 'NotFoundError') throw e;
-    }
+  if (!allowOverwrite && await fileCheck(filename)) {
+    throw new Error(`Exists: ${filename}`);
   }
   const handle = await folder.getFileHandle(filename, {create: true});
   const writer = await handle.createWritable();
@@ -213,22 +220,21 @@ async function fileDelete(filename) {
 }
 async function fileRename(oldPath, newPath) {
   log(`↘️fileRename`);
-  try {
-    await folder.getFileHandle(newPath);
+  if (await fileCheck(newPath)) {
     throw new Error(`Destination exists: ${newPath}`);
-  } catch (error) {
-    if (error.name !== 'NotFoundError') throw error;
   }
   try {
     const data = await fileRead(oldPath);
     await fileWrite(newPath, data);
-  } catch (e) {
+  } 
+  catch (e) {
     log(`❌ fileRename, copy fail: `, ...arguments, e.message);
     throw new Error(`Copy failed: ${e.message}`);
   }
   try {
     await fileDelete(oldPath);
-  } catch (e) {
+  } 
+  catch (e) {
     log(`❌ fileRename, delete fail: `, ...arguments, e.message);
     throw new Error(`Rename incomplete: ${newPath} created, ${oldPath} remains`);
   }
@@ -244,9 +250,8 @@ async function fileListAll() {
 async function fileFind(uuid) {
   log(`↘️fileFind`);
   const reconstructedFilename = nameFromMetadata(files[uuid]?.metadata);
-  if (reconstructedFilename) {
-    const fileExists = await folder.getFileHandle(reconstructedFilename).catch(() => null);
-    if (fileExists) return reconstructedFilename;
+  if (reconstructedFilename && await fileCheck(reconstructedFilename)) {
+    return reconstructedFilename;
   }
   const candidateFiles = (await fileListAll()).filter(filename => 
     filename.match(`_${uuid}\\.`)
@@ -299,11 +304,10 @@ async function inventoryCapture(mode = 'rapid') {
     const uuid = inventoryUpdate(filename, metadata);
     log(`📸 ${filename}`);
     return uuid;
-  } catch (e) {
+  } 
+  catch (e) {
     log(`❌ inventoryCapture: `, ...arguments, e.message);
-    if (!Camera.stream?.active) {
-      Camera.stream = null;
-    }
+    if (!Camera.stream?.active) { Camera.stream = null; }
     return null;
   }
 }
@@ -382,6 +386,7 @@ function showRender() {
 /***** DYNAMIC SCHEMA SYSTEM *****/
 // RESILIENT PARSING + DEFAULTS: schemaLoad should return default schema structure if all files fail, not empty string. schemaAnalyze should continue processing remaining files when individual nameToMetadata calls fail, logging specific problematic filenames. SchemaLearn should never throw - always produce usable schema.
 let schemaText = document.getElementById('schemaTextarea');
+schemaText.value = '[]';
 schemaText.addEventListener('input', ()=>{schemaDirty=true;});
 let schemaFile = null;
 let schemaDirty = false;
@@ -394,7 +399,8 @@ async function schemaLoad() {
     const content = await file.text();
     log(`📄 Loaded ${SCHEMANAME}`);
     return content;
-  } catch (e) {
+  } 
+  catch (e) {
     log(`❌ schemaLoad: `, ...arguments, e.message);
     return '[]';
   }
@@ -543,7 +549,8 @@ function schemaFromText(text) {
     if (text == null) throw new Error(`Bit nothin`);
     const parsed = JSON.parse(text);
     return Array.isArray(parsed) ? parsed : []; // ensure array
-  } catch (e) {
+  } 
+  catch (e) {
     log(`❌ schemaFromText:`, ...arguments, e.message);
     return [];
   }
@@ -553,7 +560,8 @@ function schemaToText(schema) {
   try {
     if (schema == null) throw new Error(`Bit nothin`);
     return JSON.stringify(schemaArray, null, 2);
-  } catch (e) {
+  } 
+  catch (e) {
     log("❌schemaToText:", ...arguments, e.message);
     return '';
   }
@@ -621,7 +629,8 @@ async function metadataEmpty() {
       },
       values: values
     };
-  } catch (e) {
+  } 
+  catch (e) {
     log(`❌ metadataEmpty: `, ...arguments, e.message);
   }
 }
@@ -643,7 +652,8 @@ async function galleryLoad() {
       }
     }
     await cacheSave();
-  } catch (e) {
+  } 
+  catch (e) {
     log(`❌ galleryLoad: `, ...arguments, e.message);
   }
 }
@@ -660,7 +670,8 @@ async function cacheLoad() {
       }
     }
     return cacheData;
-  } catch (e) {
+  } 
+  catch (e) {
     log(`❌ cacheLoad: `, ...arguments, e.message);
     return {};
   }
@@ -679,7 +690,8 @@ async function cacheSave() {
     const cacheJSON = JSON.stringify(cacheData);
     const blob = new Blob([cacheJSON], {type: 'application/json'});
     await fileWrite(CACHENAME, blob);
-  } catch (e) {
+  } 
+  catch (e) {
     log(`❌ cacheSave: `, ...arguments, e.message);
   }
 }
