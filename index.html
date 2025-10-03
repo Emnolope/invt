@@ -388,7 +388,6 @@ function showRender() {
 let schemaText = document.getElementById('schemaTextarea');
 schemaText.value = '[]';
 schemaText.addEventListener('input', ()=>{schemaDirty=true;});
-let schemaFile = null;
 let schemaDirty = false;
 const SCHEMANAME = 'schema.json';
 // NEEDS CHANGE: Should use fileRead function for consistency. Should not throw - return default schema object if all loads fail.
@@ -412,8 +411,8 @@ function schemaLoadButton() {
 }
 async function schemaSave() {
   log(`↘️schemaSave`);
-  await fileWrite(schemaFile, schemaText.value, true);
-  log(`💾 Schema saved to ${schemaFile}`);
+  await fileWrite(SCHEMANAME, schemaText.value, true);
+  log(`💾 Schema saved to ${SCHEMANAME}`);
 }
 function schemaSaveButton() {
   log(`↘️schemaSaveButton`);
