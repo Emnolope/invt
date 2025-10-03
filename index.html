@@ -559,7 +559,7 @@ function schemaToText(schema) {
   log(`↘️schemaToText`);
   try {
     if (schema == null) throw new Error(`Bit nothin`);
-    return JSON.stringify(schemaArray, null, 2);
+    return JSON.stringify(schema, null, 2);
   } 
   catch (e) {
     log("❌schemaToText:", ...arguments, e.message);
