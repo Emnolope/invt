@@ -404,9 +404,9 @@ async function schemaLoad() {
     return '[]';
   }
 }
-function schemaLoadButton() {
+async function schemaLoadButton() {
   log(`↘️schemaLoadButton`);
-  try {schemaText.value=schemaLoad();schemaDirty=false;}
+  try {schemaText.value=await schemaLoad();schemaDirty=false;}
   catch(e) {log(e.message);}
 }
 async function schemaSave() {
