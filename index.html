@@ -321,23 +321,17 @@ function inventoryUpdate(filename, metadata) {
 async function inventoryLoad() {
   log(`↘️inventoryLoad`);
   const filenames = await fileListAll();
-  log(`1`);
-  const files = {};
-  log(`2`);
+  const schema = schemaGet();
+  inventory = {};
   for (const filename of filenames) {
-    log(`3`);
-    const metadata = nameToMetadata(filename);
-    log(`4`);
-    if (metadata && metadata.data.UUID) {
-      log(`5`);
-      files[metadata.data.UUID] = {
+    const metadata = nameToMetadata(filename, schema);
+    if (metadata?.data?.UUID) {
+      inventory[metadata.data.UUID] = {
         metadata: metadata,
-        original: filename //still here in case, but it's NOT GOOD to use it
+        original: filename
       };
     }
   }
-  log(`6`);
-  inventory = files;
 }
 function inventoryLoadButton() {
   log(`↘️inventoryLoadButton`);
