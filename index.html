@@ -154,7 +154,6 @@ body {
     <div id="mode4" class="mode placeholder">
       <button onclick="fileFolderPickButton()">fileFolderPick</button>
       <button onclick="inventoryLoadButton()">inventoryLoad</button>
-      <
       <div>
         <textarea id="schemaTextarea" placeholder="Schema JSON"></textarea>
         <button onclick="schemaLoadButton()">schemaLoad</button>
@@ -321,7 +320,7 @@ function inventoryCaptureButtonSlow() {
 log(`↘️inventoryCaptureButtonFast`);
   try {inventoryCapture();}
   catch(e) {log(e.message);}
-
+}
 // NEEDS CHANGE: Atomic operation, metadata and filename must be in sync.
 function inventoryUpdate(filename, metadata) {
   log(`↘️inventoryUpdate`);
