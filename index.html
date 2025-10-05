@@ -144,7 +144,7 @@ body {
 <body>
   <div id="app">
     <div id="mode0" class="mode">
-      <video id="camera" autoplay playsinline onclick="rapidFireCapture()"></video>
+      <video id="camera" autoplay playsinline onclick="inventoryCapture('rapid')"></video>
     </div>
     <div id="mode1" class="mode placeholder">SLOW PICTURE MODE</div>
     <div id="mode2" class="mode">
@@ -154,6 +154,7 @@ body {
     <div id="mode4" class="mode placeholder">
       <button onclick="fileFolderPickButton()">fileFolderPick</button>
       <button onclick="inventoryLoadButton()">inventoryLoad</button>
+      <
       <div>
         <textarea id="schemaTextarea" placeholder="Schema JSON"></textarea>
         <button onclick="schemaLoadButton()">schemaLoad</button>
@@ -249,7 +250,7 @@ async function fileListAll() {
 }
 async function fileFind(uuid) {
   log(`↘️fileFind`);
-  const reconstructedFilename = nameFromMetadata(files[uuid]?.metadata);
+  const reconstructedFilename = nameFromMetadata(inventory[uuid]?.metadata);
   if (reconstructedFilename && await fileCheck(reconstructedFilename)) {
     return reconstructedFilename;
   }
@@ -287,14 +288,14 @@ async function inventorySave(imageData, metadata) {
   await fileWrite(filename, blob);
   return filename;
 }
-async function inventoryCapture(mode = 'rapid') {
+async function inventoryCapture(rapid=true) {
   log(`↘️inventoryCapture`);
   try {
     if (!Camera.Ok()) {
       await Camera.init();
     }
     const imageData = cameraCapture(Camera);
-    const metadata = mode === 'rapid' 
+    const metadata = rapid
       ? await metadataEmpty()
       : {
         data: { UUID: UUID(), ext: "jpg" },
@@ -311,11 +312,21 @@ async function inventoryCapture(mode = 'rapid') {
     return null;
   }
 }
+function inventoryCaptureButtonFast() {
+  log(`↘️inventoryCaptureButtonFast`);
+  try {inventoryCapture('rapid');}
+  catch(e) {log(e.message);}
+}
+function inventoryCaptureButtonSlow() {
+log(`↘️inventoryCaptureButtonFast`);
+  try {inventoryCapture();}
+  catch(e) {log(e.message);}
+
 // NEEDS CHANGE: Atomic operation, metadata and filename must be in sync.
 function inventoryUpdate(filename, metadata) {
   log(`↘️inventoryUpdate`);
   const uuid = metadata.data.UUID;
-  files[uuid] = { metadata, original: filename };
+  inventory[uuid] = { metadata, original: filename };
   return uuid;
 }
 async function inventoryLoad() {
@@ -380,7 +391,7 @@ function showRender() {
   document.getElementById(`mode${currentMode}`).classList.add('active');
   document.getElementById('modeBtn').textContent = modes[currentMode];
   if (currentMode === 2) {
-    showRenderGallery();
+    galleryLoad();
   }
 }
 /***** DYNAMIC SCHEMA SYSTEM *****/
