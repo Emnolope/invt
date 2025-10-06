@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>Inventory App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 * {
   margin: 0;
@@ -147,6 +148,10 @@ body {
   <div id="app">
     <div id="mode0" class="mode">
       <video id="camera" autoplay playsinline onclick="inventoryCapture('rapid')"></video>
+      <div class="camera-controls">
+        <button onclick="cameraTorchButton()>🔦</button>
+        <button onclick="cameraFlipButton()>🔄</button>
+      </div>
     </div>
     <div id="mode1" class="mode placeholder">SLOW PICTURE MODE</div>
     <div id="mode2" class="mode">
@@ -165,7 +170,7 @@ body {
       <textarea id="output" readonly style="width: 100%; font-family: monospace; font-size: 12px; overflow-y: auto;"></textarea>
     </div>
   </div>
-  <button id="modeBtn" onclick="showNextMode()"></button>
+  <button id="modeBtn" onclick="interfaceNext()"></button>
   <div id="wizardOverlay">
     <div id="wizardPanels" class="wizardPane">
     </div>
@@ -185,7 +190,7 @@ function log(...msgs) {
   outputBox.scrollTop = outputBox.scrollHeight;
 }
 window.onload = async function init() {
-  showRender();
+  interfaceRender();
   await Camera.init();
 }
 log('script start');
@@ -251,7 +256,7 @@ async function fileListAll() {
 }
 async function fileFind(uuid) {
   log(`↘️fileFind`);
-  const reconstructedFilename = nameFromMetadata(inventory[uuid]?.metadata);
+  const reconstructedFilename = metadataToName(inventory[uuid]?.metadata);
   if (reconstructedFilename && await fileCheck(reconstructedFilename)) {
     return reconstructedFilename;
   }
@@ -283,7 +288,7 @@ async function fileFolderPickButton() {
 let inventory = {};
 async function inventorySave(imageData, metadata) {
   log(`↘️inventorySave`);
-  const filename = nameFromMetadata(metadata);
+  const filename = metadataToName(metadata);
   const response = await fetch(imageData);
   const blob = await response.blob();
   await fileWrite(filename, blob);
@@ -299,7 +304,7 @@ async function inventoryCapture(rapid=true) {
     const metadata = rapid
       ? await metadataEmpty()
       : {
-        data: { UUID: UUID(), ext: "jpg" },
+        data: { UUID: metadataUUID(), ext: "jpg" },
         values: await Wizard.record()
       };
     const filename = await inventorySave(imageData, metadata);
@@ -336,7 +341,7 @@ async function inventoryLoad() {
   const schema = schemaGet();
   inventory = {};
   for (const filename of filenames) {
-    const metadata = nameToMetadata(filename, schema);
+    const metadata = metadataFromName(filename, schema);
     if (metadata?.data?.UUID) {
       inventory[metadata.data.UUID] = {
         metadata: metadata,
@@ -413,17 +418,33 @@ const Camera = {
     return canvas.toDataURL('image/jpeg');
   }
 };
+function cameraFlipButton() {
+  log(`↘️cameraFlipButton`);
+  try {Camera.flip();}
+  catch(e) {log(`❌ cameraFlipButton: `, e.message);}
+}
+function cameraTorchButton() {
+  log(`↘️cameraTorchButton`);
+  try {Camera.torch();}
+  catch(e) {log(`❌ cameraTorchButton: `, e.message);}
+}
 /***** UI OPERATIONS *****/
 const modes = ['📸', '🐌', '🖼️', '📊', '⚙️'];
 let currentMode = 0;
-function showNextMode() {
-  log(`↘️showNextMode`);
+function interfaceNext() {
+  log(`↘️interfaceNext`);
   currentMode = (currentMode + 1) % modes.length;
-  showRender();
+  interfaceRender();
   Wizard.kill();
 }
-function showRender() {
-  log(`↘️showRender`);
+function interfaceBack() {
+  log(`↘️interfaceBack`);
+  currentMode = (currentMode + modes.length - 1) % modes.length;
+  interfaceRender();
+  Wizard.kill();
+}
+function interfaceRender() {
+  log(`↘️interfaceRender`);
   document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
   document.getElementById(`mode${currentMode}`).classList.add('active');
   document.getElementById('modeBtn').textContent = modes[currentMode];
@@ -432,7 +453,7 @@ function showRender() {
   }
 }
 /***** DYNAMIC SCHEMA SYSTEM *****/
-// RESILIENT PARSING + DEFAULTS: schemaLoad should return default schema structure if all files fail, not empty string. schemaAnalyze should continue processing remaining files when individual nameToMetadata calls fail, logging specific problematic filenames. SchemaLearn should never throw - always produce usable schema.
+// RESILIENT PARSING + DEFAULTS: schemaLoad should return default schema structure if all files fail, not empty string. schemaAnalyze should continue processing remaining files when individual metadataFromName calls fail, logging specific problematic filenames. SchemaLearn should never throw - always produce usable schema.
 let schemaText = document.getElementById('schemaTextarea');
 schemaText.value = '[]';
 schemaText.addEventListener('input', ()=>{schemaDirty=true;});
@@ -480,7 +501,6 @@ const schemaHierarchy = { "single": 1, "multiple": 2, "text": 3 };
 function schemaFieldUpgrade(currentType, newType) {
   return schemaHierarchy[newType] > schemaHierarchy[currentType] ? newType : currentType;
 }
-// wrap nameToMetadata in try catch to keep analysis running even with one bad file
 function analyzeFieldPattern(collection) {
   log(`↘️analyzeFieldPattern`);
   const items = collection.filter(Boolean);
@@ -512,13 +532,14 @@ function analyzeFieldPattern(collection) {
   }
   return result;
 }
+// wrap metadataFromName in try catch to keep analysis running even with one bad file
 function schemaAnalyze(filenames) {
   log(`↘️schemaAnalyze`);
   const imageFiles = filenames.filter(f => 
     f.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)
   );
   const allMetadata = imageFiles
-    .map(filename => nameToMetadata(filename, null))
+    .map(filename => metadataFromName(filename, null))
     .filter(metadata => metadata !== null);
   if (allMetadata.length === 0) return [];
   const maxFields = Math.max(...allMetadata.map(m => m.values.length));
@@ -619,8 +640,8 @@ function schemaGet() {
 }
 //<button onclick="schemaValidate()?log('✅ Schema is valid'):log('❌ Schema validation failed');">Learn</button>
 /***** FILENAME OPERATIONS *****/
-function UUID() {
-  log(`↘️UUID`);
+function metadataUUID() {
+  log(`↘️metadataUUID`);
   const now = new Date();
   const year = now.getFullYear();                             //4
   const month = String(now.getMonth() + 1).padStart(2, '0');  //2
@@ -631,8 +652,8 @@ function UUID() {
   const mil = String(now.getMilliseconds()).padStart(3, '0'); //3
   return `${year}${month}${day}${hour}${min}${sec}${mil}`;    //4+2+2+2+2+2+3 = 17
 }
-function nameToMetadata(filename, schema=schemaGet()) {
-  log(`↘️nameToMetadata`);
+function metadataFromName(filename, schema=schemaGet()) {
+  log(`↘️metadataFromName`);
   try {
     const parts = filename.split('_');
     const [uuid, ext] = parts.pop().split('.');
@@ -653,13 +674,13 @@ function nameToMetadata(filename, schema=schemaGet()) {
     };
   }
   catch (e) {
-    log(`❌ nameToMetadata: `, ...arguments, e.message);
+    log(`❌ metadataFromName: `, ...arguments, e.message);
     return null;
   }
 }
 // AI SLOP: NEEDS CHANGE: Should never fail - return minimal metadata with single empty field if schema loading fails
-function nameFromMetadata(metadata) {
-  log(`↘️nameFromMetadata`);
+function metadataToName(metadata) {
+  log(`↘️metadataToName`);
   const parts = metadata.values.map(valueArray => valueArray.join(','));
   return [...parts, metadata.data.UUID].join('_') + '.' + metadata.data.ext;
 }
@@ -671,7 +692,7 @@ async function metadataEmpty() {
     const values = Array(schema.length).fill([]);
     return {
       data: {
-        UUID: UUID(),
+        UUID: metadataUUID(),
         ext: ""
       },
       values: values
