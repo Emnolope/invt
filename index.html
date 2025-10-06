@@ -354,29 +354,65 @@ function inventoryLoadButton() {
 const Camera = {
   stream: null,
   video: null,
-  Ok() { 
-    return this.stream?.active && this.video?.videoWidth>0; 
+  track: null,
+  Ok() {
+    return this.stream?.active && this.video?.videoWidth > 0;
   },
   async init() {
     log(`↘️Camera.init()`);
-    this.stream = await navigator.mediaDevices.getUserMedia({video: true});
-    this.video = document.getElementById('camera');
-    this.video.srcObject = this.stream;
-    await new Promise(resolve => {
-      const check = () => this.video.videoWidth ? resolve() : setTimeout(check, 100);
-      check();
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' }
+        }
+      });
+      this.video = document.getElementById('camera');
+      this.video.srcObject = this.stream;
+      this.track = this.stream.getVideoTracks()[0];
+      await new Promise((resolve, reject) => {
+        // Use once: true to automatically remove the listener after it fires once
+        this.video.addEventListener('loadedmetadata', resolve, { once: true });
+        setTimeout(() => reject(new Error("Camera stream metadata load timeout.")), 5000); 
+      });
+    } catch (e) {
+      log(`❌ Camera.init() failed: `, e.message);
+      throw e;
+    }
+  },
+  async flip() {
+    log(`↘️Camera.flip()`);
+    this.stream?.getTracks().forEach(t => t.stop());
+    const currentMode = this.track?.getSettings()?.facingMode;
+    const newMode = (currentMode === 'environment') ? 'user' : 'environment';
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: newMode }
+      }
     });
+    this.video.srcObject = this.stream;
+    this.track = this.stream.getVideoTracks()[0];
+  },
+  async torch() {
+    log(`↘️Camera.torch()`);
+    if (!this.track) return;
+    const currentTorchState = this.track.getSettings().torch || false;
+    await this.track.applyConstraints({
+      advanced: [{ torch: !currentTorchState }]
+    });
+  },
+  capture() {
+    log(`↘️Camera.capture()`);
+    if (!this.Ok()) {
+      throw new Error("Camera not ready for capture.");
+    }
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = this.video.videoWidth;
+    canvas.height = this.video.videoHeight;
+    ctx.drawImage(this.video, 0, 0);
+    return canvas.toDataURL('image/jpeg');
   }
 };
-function cameraCapture(camera) {
-  log(`↘️cameraCapture`);
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  canvas.width = camera.video.videoWidth;
-  canvas.height = camera.video.videoHeight;
-  ctx.drawImage(camera.video, 0, 0);
-  return canvas.toDataURL('image/jpeg');
-}
 /***** UI OPERATIONS *****/
 const modes = ['📸', '🐌', '🖼️', '📊', '⚙️'];
 let currentMode = 0;
