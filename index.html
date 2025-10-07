@@ -40,14 +40,14 @@ body {
   object-fit: cover;
   cursor: pointer;
 }
-/* WHAT IS THIS, either needs renaming or deletion */
-.placeholder {
+.camera-controls {
+  position: fixed;
+  bottom: 100px;
+  width: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 3em;
-  background: #333;
-  color: white;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 1;
 }
 #gallery {
   display: grid;
@@ -115,6 +115,16 @@ body {
 .wizard-input:checked + .wizard-label:hover {
   background: #0056b3;
 }
+.wizard-text {
+  width: 100%;
+  height: 100%;
+  font-size: 2em;
+  padding: 20px;
+  background: #fff;
+  border: none;
+  outline: none;
+  resize: none;
+}
 .nav-button {
   font-size: 1.5em;
   background: #333;
@@ -131,16 +141,6 @@ body {
 }
 .nav-button:active {
   background: #777;
-}
-.wizard-text {
-  width: 100%;
-  height: 100%;
-  font-size: 2em;
-  padding: 20px;
-  background: #fff;
-  border: none;
-  outline: none;
-  resize: none;
 }
   </style>
 </head>
@@ -301,12 +301,10 @@ async function inventoryCapture(rapid=true) {
       await Camera.init();
     }
     const imageData = cameraCapture(Camera);
-    const metadata = rapid
-      ? await metadataEmpty()
-      : {
-        data: { UUID: metadataUUID(), ext: "jpg" },
-        values: await Wizard.record()
-      };
+const metadata = {
+   data: { UUID: metadataUUID(), ext: "jpg" },
+      values: rapid ? [] : await Wizard.record()
+    };
     const filename = await inventorySave(imageData, metadata);
     const uuid = inventoryUpdate(filename, metadata);
     log(`📸 ${filename}`);
