@@ -1,19 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Inventory App</title>
+  <title>InvtSysShell3+ v17.16</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
+/***** RESET *****/
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
+/***** LAYOUT *****/
 body {
   height: 100vh;
   font-family: system-ui, -apple-system, sans-serif;
   overflow: hidden;
 }
+/***** MODE SYSTEM *****/
 .mode {
   display: none;
 }
@@ -27,18 +30,23 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
 }
+/***** BUTTON BASE *****/
+button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2em;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  padding: 10px;
+}
+/***** POSITIONED CONTROLS *****/
 #modeBtn {
   position: fixed;
   top: 10px;
   right: 10px;
   z-index: 1000;
-  padding: 10px;
-}
-#camera {
-  width: 100vw;
-  height: 100vh;
-  object-fit: cover;
-  cursor: pointer;
 }
 .camera-controls {
   position: fixed;
@@ -47,8 +55,16 @@ body {
   display: flex;
   justify-content: space-between;
   padding: 0 20px;
-  z-index: 1;
+  z-index: 100;
 }
+/***** CAMERA *****/
+#camera {
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  cursor: pointer;
+}
+/***** GALLERY *****/
 #gallery {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -59,7 +75,7 @@ body {
   object-fit: cover;
   cursor: pointer;
 }
-/***** WIZARD STYLING *****/
+/***** WIZARD OVERLAY *****/
 #wizardOverlay {
   position: fixed;
   display: none;
@@ -92,18 +108,12 @@ body {
   grid-template-columns: repeat(4, 1fr);
   gap: 2px;
 }
+/***** WIZARD INPUTS *****/
 .wizard-input {
   display: none;
 }
 .wizard-label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: #ddd;
-  font-size: 2em;
-  cursor: pointer;
-  user-select: none;
-  border: none;
 }
 .wizard-label:hover {
   background: #bbb;
@@ -129,12 +139,6 @@ body {
   font-size: 1.5em;
   background: #333;
   color: white;
-  border: none;
-  cursor: pointer;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 .nav-button:hover {
   background: #555;
@@ -301,10 +305,8 @@ async function inventoryCapture(rapid=true) {
       await Camera.init();
     }
     const imageData = cameraCapture(Camera);
-const metadata = {
-   data: { UUID: metadataUUID(), ext: "jpg" },
-      values: rapid ? [] : await Wizard.record()
-    };
+    const metadata = metadataDefault();
+    if (!rapid) metadata.values = await Wizard.record();
     const filename = await inventorySave(imageData, metadata);
     const uuid = inventoryUpdate(filename, metadata);
     log(`📸 ${filename}`);
@@ -683,22 +685,13 @@ function metadataToName(metadata) {
   return [...parts, metadata.data.UUID].join('_') + '.' + metadata.data.ext;
 }
 // Does this function even need to hold the same size? Leave values as empty array?
-async function metadataEmpty() {
-  log(`↘️metadataEmpty`);
-  try {
-    const schema = schemaGet();
-    const values = Array(schema.length).fill([]);
-    return {
-      data: {
-        UUID: metadataUUID(),
-        ext: ""
-      },
-      values: values
-    };
-  } 
-  catch (e) {
-    log(`❌ metadataEmpty: `, ...arguments, e.message);
-  }
+
+function metadataDefault() {
+  log(`↘️metadataDefault`);
+  return {
+    data: { UUID: metadataUUID(), ext: "jpg" },
+    values: schemaGet().map(() => [])
+  };
 }
 /***** GALLERY *****/
 let thumbnailCache = {};
@@ -936,12 +929,16 @@ const Wizard = (function() {
             next();
           };
         }
-        const label = document.createElement('label');
-        label.htmlFor = id;
-        label.className = 'wizard-label';
-        label.textContent = option;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'wizard-label';
+        button.textContent = option;
+        button.onclick = () => {
+          input.checked = !input.checked;
+          input.onchange();
+        };
         screen.appendChild(input);
-        screen.appendChild(label);
+        screen.appendChild(button);
       });
     }
   }
