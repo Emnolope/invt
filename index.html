@@ -455,7 +455,7 @@ function cameraTorchButton() {
 }
 /***** UI OPERATIONS *****/
 const uiModes = ['📸', '🖼️', '📊', '⚙️'];
-let uiCurrent = 📸;
+let uiCurrent = '📸';
 let uiWizardToggle = false;
 function uiWizardToggler() {
   log(`↘️uiWizardToggler`);
@@ -482,7 +482,7 @@ function uiRender() {
   document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
   document.getElementById(`mode${uiCurrent}`).classList.add('active');
   document.getElementById('modeBtn').textContent = uiModes[uiCurrent];
-  if (uiCurrent === 🖼️) {
+  if (uiCurrent === '🖼️') {
     galleryLoad();
   }
 }
@@ -738,7 +738,7 @@ async function galleryLoad() {
     await cacheLoad();
     for (const uuid in inventory) {
       await new Promise(resolve => requestAnimationFrame(resolve));
-      if (uiCurrent !== 🖼️) return;
+      if (uiCurrent !== '🖼️') return;
       const thumbnailDataURL = await galleryThumbnailGet(uuid);
       if (thumbnailDataURL) {
         const galleryImg = galleryImageElementCreate(uuid, thumbnailDataURL);
