@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v17.20</title>
+  <title>InvtSysShell3+ v17.23</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -171,19 +171,18 @@ button {
 </head>
 <body>
   <div id="app">
-    <div id="mode📸" class="mode">
-      <video id="camera" autoplay playsinline onclick="inventoryCapture('rapid')"></video>
-      <div class="camera-controls">
+    <div id="mode-camera" class="mode">
+      <video id="camera" autoplay playsinline onclick="inventoryCapture('rapid')"></video>     <div class="camera-controls">
         <button onclick="cameraTorchButton()">🔦</button>
         <button onclick="uiWizardToggler()">🐌</button>
         <button onclick="cameraFlipButton()">🔄</button>
       </div>
     </div>
-    <div id="mode🖼️" class="mode">
+    <div id="mode-gallery" class="mode">    
       <div id="gallery"></div>
     </div>
-    <div id="mode📊" class="mode">TABLE VIEW</div>
-    <div id="mode⚙️" class="mode">
+    <div id="mode-table" class="mode">TABLE VIEW</div>
+    <div id="mode-settings" class="mode">
       <button onclick="fileFolderPickButton()">fileFolderPick</button>
       <button onclick="inventoryLoadButton()">inventoryLoad</button>
       <div>
@@ -454,37 +453,43 @@ function cameraTorchButton() {
   catch(e) {log(`❌ cameraTorchButton: `, e.message);}
 }
 /***** UI OPERATIONS *****/
-const uiModes = ['📸', '🖼️', '📊', '⚙️'];
-let uiCurrent = '📸';
+const uiModes = {
+  mode-camera: '📸',
+  mode-gallery: '🖼️',
+  mode-table: '📊',
+  mode-settings: '⚙️'
+};
+const uiModeNames = Object.keys(uiModes);
+let uiMode = 0;
 let uiWizardToggle = false;
-function uiWizardToggler() {
-  log(`↘️uiWizardToggler`);
-  uiWizardToggle = !uiWizardToggle
-  const btn = event.target;
-  btn.textContent = (uiWizardToggle) ? '⚡' : '🐌';
-}
 function uiNext() {
-    log(`↘️uiNext`);
-    const index = uiModes.indexOf(uiCurrent);;
-    uiCurrent = uiModes[(index + 1) % uiModes.length];
-    uiRender();
-    Wizard.kill();
+  log(`↘️uiNext`);
+  uiMode = (uiMode + 1) % uiModeNames.length;
+  uiRender();
+  Wizard.kill();
 }
 function uiBack() {
-    log(`↘️uiBack`);
-    const index = uiModes.indexOf(uiCurrent);;
-    uiCurrent = uiModes[(index + uiModes.length - 1) % uiModes.length];
-    uiRender();
-    Wizard.kill();
+  log(`↘️uiBack`);
+  uiMode = uiMode ? uiMode - 1 : uiModeNames.length - 1;
+  uiRender();
+  Wizard.kill();
 }
 function uiRender() {
   log(`↘️uiRender`);
+  const name = uiModeNames[uiMode];
   document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
-  document.getElementById(`mode${uiCurrent}`).classList.add('active');
-  document.getElementById('modeBtn').textContent = uiModes[uiCurrent];
-  if (uiCurrent === '🖼️') {
-    galleryLoad();
-  }
+  document.getElementById(name).classList.add('active');
+  if (name === 'mode-gallery') galleryLoad();
+}
+function uiWizardToggler() {
+  log(`↘️uiWizardToggler`);
+  uiWizardToggle = !uiWizardToggle;
+  const buttons = document.querySelectorAll('.camera-controls button');
+  buttons.forEach(btn => {
+    if (btn.onclick?.toString().includes('uiWizardToggler')) {
+      btn.textContent = uiWizardToggle ? '⚡' : '🐌';
+    }
+  });
 }
 /***** DYNAMIC SCHEMA SYSTEM *****/
 // RESILIENT PARSING + DEFAULTS: schemaLoad should return default schema structure if all files fail, not empty string. schemaAnalyze should continue processing remaining files when individual metadataFromName calls fail, logging specific problematic filenames. SchemaLearn should never throw - always produce usable schema.
@@ -738,7 +743,7 @@ async function galleryLoad() {
     await cacheLoad();
     for (const uuid in inventory) {
       await new Promise(resolve => requestAnimationFrame(resolve));
-      if (uiCurrent !== '🖼️') return;
+      if (uiMode !== 'mode-gallery') return;
       const thumbnailDataURL = await galleryThumbnailGet(uuid);
       if (thumbnailDataURL) {
         const galleryImg = galleryImageElementCreate(uuid, thumbnailDataURL);
