@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v17.19</title>
+  <title>InvtSysShell3+ v17.20</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -38,11 +38,9 @@ body {
   color: white;
   border-radius: 8px;
 }
-
 .mode-btn:hover {
   background: rgba(0, 0, 0, 0.7);
 }
-
 .mode-btn:active {
   background: rgba(0, 0, 0, 0.9);
 }
@@ -71,12 +69,6 @@ button {
   padding: 10px;
 }
 /***** POSITIONED CONTROLS *****/
-#modeBtn {
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  z-index: 1000;
-}
 .camera-controls {
   position: fixed;
   bottom: 100px;
@@ -179,7 +171,7 @@ button {
 </head>
 <body>
   <div id="app">
-    <div id="mode0" class="mode">
+    <div id="mode📸" class="mode">
       <video id="camera" autoplay playsinline onclick="inventoryCapture('rapid')"></video>
       <div class="camera-controls">
         <button onclick="cameraTorchButton()">🔦</button>
@@ -187,12 +179,11 @@ button {
         <button onclick="cameraFlipButton()">🔄</button>
       </div>
     </div>
-    <div id="mode1" class="mode placeholder">SLOW PICTURE MODE</div>
-    <div id="mode2" class="mode">
+    <div id="mode🖼️" class="mode">
       <div id="gallery"></div>
     </div>
-    <div id="mode3" class="mode placeholder">TABLE VIEW</div>
-    <div id="mode4" class="mode placeholder">
+    <div id="mode📊" class="mode">TABLE VIEW</div>
+    <div id="mode⚙️" class="mode">
       <button onclick="fileFolderPickButton()">fileFolderPick</button>
       <button onclick="inventoryLoadButton()">inventoryLoad</button>
       <div>
@@ -464,7 +455,7 @@ function cameraTorchButton() {
 }
 /***** UI OPERATIONS *****/
 const uiModes = ['📸', '🖼️', '📊', '⚙️'];
-
+let uiCurrent = 📸;
 let uiWizardToggle = false;
 function uiWizardToggler() {
   log(`↘️uiWizardToggler`);
@@ -472,7 +463,6 @@ function uiWizardToggler() {
   const btn = event.target;
   btn.textContent = (uiWizardToggle) ? '⚡' : '🐌';
 }
-let uiCurrent = 📸;
 function uiNext() {
     log(`↘️uiNext`);
     const index = uiModes.indexOf(uiCurrent);;
@@ -483,7 +473,7 @@ function uiNext() {
 function uiBack() {
     log(`↘️uiBack`);
     const index = uiModes.indexOf(uiCurrent);;
-    uiCurrent = uiModes[(index + ҄uiModes.length - 1) % uiModes.length];
+    uiCurrent = uiModes[(index + uiModes.length - 1) % uiModes.length];
     uiRender();
     Wizard.kill();
 }
