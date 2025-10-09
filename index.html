@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v17.16</title>
+  <title>InvtSysShell3+ v17.19</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -17,6 +17,35 @@ body {
   overflow: hidden;
 }
 /***** MODE SYSTEM *****/
+.mode-navigation {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: flex;
+  gap: 10px;
+}
+.mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2em;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border-radius: 8px;
+}
+
+.mode-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.mode-btn:active {
+  background: rgba(0, 0, 0, 0.9);
+}
 .mode {
   display: none;
 }
@@ -154,6 +183,7 @@ button {
       <video id="camera" autoplay playsinline onclick="inventoryCapture('rapid')"></video>
       <div class="camera-controls">
         <button onclick="cameraTorchButton()">🔦</button>
+        <button onclick="uiWizardToggler()">🐌</button>
         <button onclick="cameraFlipButton()">🔄</button>
       </div>
     </div>
@@ -174,7 +204,10 @@ button {
       <textarea id="output" readonly style="width: 100%; font-family: monospace; font-size: 12px; overflow-y: auto;"></textarea>
     </div>
   </div>
-  <button id="modeBtn" onclick="interfaceNext()"></button>
+  <div class="mode-navigation">
+    <button class="mode-btn" onclick="uiBack()">⬅️</button>
+    <button class="mode-btn" onclick="uiNext()">➡️</button>
+  </div>
   <div id="wizardOverlay">
     <div id="wizardPanels" class="wizardPane">
     </div>
@@ -194,7 +227,7 @@ function log(...msgs) {
   outputBox.scrollTop = outputBox.scrollHeight;
 }
 window.onload = async function init() {
-  interfaceRender();
+  uiRender();
   await Camera.init();
 }
 log('script start');
@@ -304,9 +337,9 @@ async function inventoryCapture(rapid=true) {
     if (!Camera.Ok()) {
       await Camera.init();
     }
-    const imageData = cameraCapture(Camera);
+    const imageData = Camera.capture();
     const metadata = metadataDefault();
-    if (!rapid) metadata.values = await Wizard.record();
+    if (uiWizardToggle) metadata.values = await Wizard.record();
     const filename = await inventorySave(imageData, metadata);
     const uuid = inventoryUpdate(filename, metadata);
     log(`📸 ${filename}`);
@@ -387,15 +420,16 @@ const Camera = {
   async flip() {
     log(`↘️Camera.flip()`);
     this.stream?.getTracks().forEach(t => t.stop());
-    const currentMode = this.track?.getSettings()?.facingMode;
-    const newMode = (currentMode === 'environment') ? 'user' : 'environment';
+    const side = this.track?.getSettings()?.facingMode || 'environment';
     this.stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: newMode }
-      }
+      video: { facingMode: { ideal: (side === 'environment') ? 'user' : 'environment'} }
     });
     this.video.srcObject = this.stream;
     this.track = this.stream.getVideoTracks()[0];
+    await new Promise((resolve, reject) => {
+      this.video.addEventListener('loadedmetadata', resolve, { once: true });
+      setTimeout(() => reject(new Error("Camera flip timeout")), 5000);
+    });
   },
   async torch() {
     log(`↘️Camera.torch()`);
@@ -429,26 +463,36 @@ function cameraTorchButton() {
   catch(e) {log(`❌ cameraTorchButton: `, e.message);}
 }
 /***** UI OPERATIONS *****/
-const modes = ['📸', '🐌', '🖼️', '📊', '⚙️'];
-let currentMode = 0;
-function interfaceNext() {
-  log(`↘️interfaceNext`);
-  currentMode = (currentMode + 1) % modes.length;
-  interfaceRender();
-  Wizard.kill();
+const uiModes = ['📸', '🖼️', '📊', '⚙️'];
+
+let uiWizardToggle = false;
+function uiWizardToggler() {
+  log(`↘️uiWizardToggler`);
+  uiWizardToggle = !uiWizardToggle
+  const btn = event.target;
+  btn.textContent = (uiWizardToggle) ? '⚡' : '🐌';
 }
-function interfaceBack() {
-  log(`↘️interfaceBack`);
-  currentMode = (currentMode + modes.length - 1) % modes.length;
-  interfaceRender();
-  Wizard.kill();
+let uiCurrent = 📸;
+function uiNext() {
+    log(`↘️uiNext`);
+    const index = uiModes.indexOf(uiCurrent);;
+    uiCurrent = uiModes[(index + 1) % uiModes.length];
+    uiRender();
+    Wizard.kill();
 }
-function interfaceRender() {
-  log(`↘️interfaceRender`);
+function uiBack() {
+    log(`↘️uiBack`);
+    const index = uiModes.indexOf(uiCurrent);;
+    uiCurrent = uiModes[(index + ҄uiModes.length - 1) % uiModes.length];
+    uiRender();
+    Wizard.kill();
+}
+function uiRender() {
+  log(`↘️uiRender`);
   document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
-  document.getElementById(`mode${currentMode}`).classList.add('active');
-  document.getElementById('modeBtn').textContent = modes[currentMode];
-  if (currentMode === 2) {
+  document.getElementById(`mode${uiCurrent}`).classList.add('active');
+  document.getElementById('modeBtn').textContent = uiModes[uiCurrent];
+  if (uiCurrent === 🖼️) {
     galleryLoad();
   }
 }
@@ -704,7 +748,7 @@ async function galleryLoad() {
     await cacheLoad();
     for (const uuid in inventory) {
       await new Promise(resolve => requestAnimationFrame(resolve));
-      if (currentMode !== 2) return;
+      if (uiCurrent !== 🖼️) return;
       const thumbnailDataURL = await galleryThumbnailGet(uuid);
       if (thumbnailDataURL) {
         const galleryImg = galleryImageElementCreate(uuid, thumbnailDataURL);
