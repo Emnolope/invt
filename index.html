@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v17.23+</title>
+  <title>InvtSysShell3+ v17.25</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -16,67 +16,54 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
   overflow: hidden;
 }
-/***** MODE SYSTEM *****/
-.mode-navigation {
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  z-index: 1000;
-  display: flex;
-  gap: 10px;
-}
-.mode-btn {
+/***** UNIVERSAL BUTTON *****/
+button {
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 2em;
+  padding: 10px;
   border: none;
+  border-radius: 8px;
   cursor: pointer;
   user-select: none;
-  padding: 10px;
   background: rgba(0, 0, 0, 0.5);
   color: white;
-  border-radius: 8px;
 }
-.mode-btn:hover {
+button:hover {
   background: rgba(0, 0, 0, 0.7);
 }
-.mode-btn:active {
+button:active {
   background: rgba(0, 0, 0, 0.9);
 }
+/***** FIXED CONTROLS *****/
+.fixed-controls {
+  position: fixed;
+  display: flex;
+  gap: 10px;
+  z-index: 100;
+}
+.mode-controls {
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+}
+.camera-controls {
+  bottom: 100px;
+  left: 20px;
+  right: 20px;
+  justify-content: space-between;
+}
+/***** MODE SYSTEM *****/
 .mode {
   display: none;
 }
 .mode.active {
   display: block;
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   overflow-y: auto;
   overflow-x: hidden;
-}
-/***** BUTTON BASE *****/
-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2em;
-  border: none;
-  cursor: pointer;
-  user-select: none;
-  padding: 10px;
-}
-/***** POSITIONED CONTROLS *****/
-.camera-controls {
-  position: fixed;
-  bottom: 100px;
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  padding: 0 20px;
-  z-index: 100;
 }
 /***** CAMERA *****/
 #camera {
@@ -99,16 +86,13 @@ button {
 /***** WIZARD OVERLAY *****/
 #wizardOverlay {
   position: fixed;
+  inset: 0;
   display: none;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
   flex-direction: column;
-  z-index: 2;
   background: #000;
   padding: 2px;
   gap: 2px;
+  z-index: 2000;
 }
 .wizardPane {
   flex: 1;
@@ -129,12 +113,23 @@ button {
   grid-template-columns: repeat(4, 1fr);
   gap: 2px;
 }
+#wizardNavi button {
+  font-size: 1.5em;
+  background: #333;
+}
+#wizardNavi button:hover {
+  background: #555;
+}
+#wizardNavi button:active {
+  background: #777;
+}
 /***** WIZARD INPUTS *****/
 .wizard-input {
   display: none;
 }
 .wizard-label {
   background: #ddd;
+  color: #000;
 }
 .wizard-label:hover {
   background: #bbb;
@@ -152,33 +147,24 @@ button {
   font-size: 2em;
   padding: 20px;
   background: #fff;
+  color: #000;
   border: none;
   outline: none;
   resize: none;
-}
-.nav-button {
-  font-size: 1.5em;
-  background: #333;
-  color: white;
-}
-.nav-button:hover {
-  background: #555;
-}
-.nav-button:active {
-  background: #777;
 }
   </style>
 </head>
 <body>
   <div id="app">
     <div id="mode-camera" class="mode">
-      <video id="camera" autoplay playsinline onclick="inventoryCapture('rapid')"></video>     <div class="camera-controls">
+      <video id="camera" autoplay playsinline onclick="inventoryCapture('rapid')"></video>
+      <div class="fixed-controls camera-controls">
         <button onclick="cameraTorchButton()">🔦</button>
         <button onclick="uiWizardToggler()">🐌</button>
         <button onclick="cameraFlipButton()">🔄</button>
       </div>
     </div>
-    <div id="mode-gallery" class="mode">    
+    <div id="mode-gallery" class="mode">
       <div id="gallery"></div>
     </div>
     <div id="mode-table" class="mode">TABLE VIEW</div>
@@ -194,15 +180,13 @@ button {
       <textarea id="output" readonly style="width: 100%; font-family: monospace; font-size: 12px; overflow-y: auto;"></textarea>
     </div>
   </div>
-  <div class="mode-navigation">
-    <button class="mode-btn" onclick="uiBack()">⬅️</button>
-    <button class="mode-btn" onclick="uiNext()">➡️</button>
+  <div class="fixed-controls mode-controls">
+    <button onclick="uiBack()">⬅️</button>
+    <button onclick="uiNext()">➡️</button>
   </div>
   <div id="wizardOverlay">
-    <div id="wizardPanels" class="wizardPane">
-    </div>
-    <div id="wizardNavi">
-    </div>
+    <div id="wizardPanels" class="wizardPane"></div>
+    <div id="wizardNavi"></div>
   </div>
 <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
 <script>eruda.init();</script>
@@ -409,10 +393,15 @@ const Camera = {
   },
   async flip() {
     log(`↘️Camera.flip()`);
-    this.stream?.getTracks().forEach(t => t.stop());
-    const side = this.track?.getSettings()?.facingMode || 'environment';
+    const currentMode = this.track?.getSettings()?.facingMode || 'environment';
+    if (this.stream) {
+      this.stream.getTracks().forEach(t => t.stop());
+      this.stream = null;  // Explicitly null it out
+      this.track = null;
+    }
+    const newMode = (currentMode === 'environment') ? 'user' : 'environment';
     this.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: (side === 'environment') ? 'user' : 'environment'} }
+      video: { facingMode: { ideal: newMode } }
     });
     this.video.srcObject = this.stream;
     this.track = this.stream.getVideoTracks()[0];
