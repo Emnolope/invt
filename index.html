@@ -789,7 +789,7 @@ async function cacheSave() {
     }
     const cacheJSON = JSON.stringify(cacheData);
     const blob = new Blob([cacheJSON], {type: 'application/json'});
-    await fileWrite(CACHENAME, blob);
+    await fileWrite(CACHENAME, blob, true);
   } 
   catch (e) {
     log(`❌ cacheSave: `, ...arguments, e.message);
