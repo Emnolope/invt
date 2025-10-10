@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v17.26</title>
+  <title>InvtSysShell3+ v17.27</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -203,9 +203,18 @@ function log(...msgs) {
   outputBox.value += `[${new Date().toISOString()}] ${message}\n`;
   outputBox.scrollTop = outputBox.scrollHeight;
 }
-window.onload = async function init() {
-  uiRender();
-  await Camera.init();
+window.onload = 
+async function init() {
+  try {
+    uiRender();
+    await Camera.init();
+    //await fileFolderPickButton();
+    //await schemaLoadButton();
+    //await schemaLearnButton();
+    //await inventoryLoadButton();
+  } catch (e) {
+    log(`❌ init failed: ${e.message}`);
+  }
 }
 log('script start');
 /***** LOW LEVEL I/O OPERATIONS *****/
@@ -451,24 +460,24 @@ const uiModes = {
   'mode-table': '📊',
   'mode-settings': '⚙️'
 };
-const uiModeNames = Object.keys(uiModes);
-let uiMode = 0;
+const uiArray = Object.keys(uiModes);
+let uiIndex = 0;
 let uiWizardToggle = false;
 function uiNext() {
   log(`↘️uiNext`);
-  uiMode = (uiMode + 1) % uiModeNames.length;
+  uiIndex = (uiIndex + 1) % uiArray.length;
   uiRender();
   Wizard.kill();
 }
 function uiBack() {
   log(`↘️uiBack`);
-  uiMode = uiMode ? uiMode - 1 : uiModeNames.length - 1;
+  uiIndex = uiIndex ? uiIndex - 1 : uiArray.length - 1;
   uiRender();
   Wizard.kill();
 }
 function uiRender() {
   log(`↘️uiRender`);
-  const name = uiModeNames[uiMode];
+  const name = uiArray[uiIndex];
   document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
   document.getElementById(name).classList.add('active');
   if (name === 'mode-gallery') galleryLoad();
@@ -735,7 +744,7 @@ async function galleryLoad() {
     await cacheLoad();
     for (const uuid in inventory) {
       await new Promise(resolve => requestAnimationFrame(resolve));
-      if (uiMode !== 'mode-gallery') return;
+      if (uiArray[uiIndex] !== 'mode-gallery') return;
       const thumbnailDataURL = await galleryThumbnailGet(uuid);
       if (thumbnailDataURL) {
         const galleryImg = galleryImageElementCreate(uuid, thumbnailDataURL);
@@ -768,7 +777,7 @@ async function cacheLoad() {
   }
 }
 async function cacheSave() {
-  log(`↘️cameraSave`);
+  log(`↘️cacheSave`);
   try {
     const cacheData = {};
     for (const uuid in inventory) {
