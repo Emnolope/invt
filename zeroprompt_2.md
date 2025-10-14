@@ -4,6 +4,13 @@ Try to understand what the human is doing, and what is happening. And what your 
 
 
 
+
+`````context-that-should-be-in-the-first-zero-shot
+Use your meditation spacer tokens to figure out the answer.
+`````
+
+
+
 `````ignore this text block of unresolved problems
 Files reality → Memory reality → UI reality
 The filesystem is authoritative. Filenames encode metadata directly. The app reads filenames, parses them into runtime objects, displays them, and writes them back atomically
@@ -16,8 +23,8 @@ Object representation: The metadata structure ({data: {UUID, ext}, values: [[...
 
 Translation functions are BRIDGES:
 
-metadataFromName: string → object
-metadataToName: object → string
+inventoryFromFile: string → object
+fileFromInventory: object → string
 
 Inventory Object is Runtime State Cache
 Gallery, table, and any future views are RENDERERS that consume inventory object. They don't manage their own data.
@@ -41,7 +48,7 @@ balance between (
 )
 
 Optimistic Pathways:
-User picks folder → fileWrite saves image with UUID filename → fileRead retrieves exact file → fileRename atomically changes filename → fileDelete removes unwanted files → fileFind locates file by UUID
+User picks folder → fileCreate saves image with UUID filename → fileRead retrieves exact file → fileUpdate atomically changes filename → fileDestroy removes unwanted files → fileFind locates file by UUID
 Schema System Optimistic Path:
 User loads valid schema.json → schemaFromText parses to object → UI builds from schema → user input validates against schema → schemaToText serializes back → file saves successfully
 Camera System Optimistic Path:
@@ -140,7 +147,7 @@ METADATA proposed structure:
 JSON.Stringify(metadata)===`{
   "data":{
     //"original":"Bando.BoxA.Pouch._c,t,b_STAY___Gloves are great where fire and workshop usage_202507101532001.png", //Because filename can be and should be reconstructed, and UUID should be only programatic identifier.
-    "UUID":"20250710211532001",
+    //"UUID":"20250710211532001",
     "ext":"png"
   },
   "values":[
@@ -184,12 +191,12 @@ cache.json: {
 
 
 
-Claude, this is timeline 17.20.
+Claude, this is timeline 17.30.
 `````content
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v17.20</title>
+  <title>InvtSysShell3+ v17.28</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -204,67 +211,57 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
   overflow: hidden;
 }
-/***** MODE SYSTEM *****/
-.mode-navigation {
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  z-index: 1000;
-  display: flex;
-  gap: 10px;
-}
-.mode-btn {
+/***** UNIVERSAL BUTTON *****/
+button {
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 2em;
+  padding: 10px;
   border: none;
+  border-radius: 8px;
   cursor: pointer;
   user-select: none;
-  padding: 10px;
   background: rgba(0, 0, 0, 0.5);
   color: white;
-  border-radius: 8px;
 }
-.mode-btn:hover {
+button:hover {
   background: rgba(0, 0, 0, 0.7);
 }
-.mode-btn:active {
+button:active {
   background: rgba(0, 0, 0, 0.9);
 }
+/***** FIXED CONTROLS *****/
+.fixed-controls {
+  position: fixed;
+  display: flex;
+  gap: 10px;
+  z-index: 100;
+}
+.mode-controls {
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  z-index: 1000;
+  justify-content: space-between;
+}
+.camera-controls {
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  z-index: 1000;
+  justify-content: space-between;
+}
+/***** MODE SYSTEM *****/
 .mode {
   display: none;
 }
 .mode.active {
   display: block;
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   overflow-y: auto;
   overflow-x: hidden;
-}
-/***** BUTTON BASE *****/
-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2em;
-  border: none;
-  cursor: pointer;
-  user-select: none;
-  padding: 10px;
-}
-/***** POSITIONED CONTROLS *****/
-.camera-controls {
-  position: fixed;
-  bottom: 100px;
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  padding: 0 20px;
-  z-index: 100;
 }
 /***** CAMERA *****/
 #camera {
@@ -287,16 +284,13 @@ button {
 /***** WIZARD OVERLAY *****/
 #wizardOverlay {
   position: fixed;
+  inset: 0;
   display: none;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
   flex-direction: column;
-  z-index: 2;
   background: #000;
   padding: 2px;
   gap: 2px;
+  z-index: 2000;
 }
 .wizardPane {
   flex: 1;
@@ -317,12 +311,23 @@ button {
   grid-template-columns: repeat(4, 1fr);
   gap: 2px;
 }
+#wizardNavi button {
+  font-size: 1.5em;
+  background: #333;
+}
+#wizardNavi button:hover {
+  background: #555;
+}
+#wizardNavi button:active {
+  background: #777;
+}
 /***** WIZARD INPUTS *****/
 .wizard-input {
   display: none;
 }
 .wizard-label {
   background: #ddd;
+  color: #000;
 }
 .wizard-label:hover {
   background: #bbb;
@@ -340,40 +345,30 @@ button {
   font-size: 2em;
   padding: 20px;
   background: #fff;
+  color: #000;
   border: none;
   outline: none;
   resize: none;
-}
-.nav-button {
-  font-size: 1.5em;
-  background: #333;
-  color: white;
-}
-.nav-button:hover {
-  background: #555;
-}
-.nav-button:active {
-  background: #777;
 }
   </style>
 </head>
 <body>
   <div id="app">
-    <div id="mode📸" class="mode">
-      <video id="camera" autoplay playsinline onclick="inventoryCapture('rapid')"></video>
-      <div class="camera-controls">
+    <div id="mode-camera" class="mode">
+      <video id="camera" autoplay playsinline onclick="uiCapture('rapid')"></video>
+      <div class="fixed-controls camera-controls">
         <button onclick="cameraTorchButton()">🔦</button>
         <button onclick="uiWizardToggler()">🐌</button>
         <button onclick="cameraFlipButton()">🔄</button>
       </div>
     </div>
-    <div id="mode🖼️" class="mode">
+    <div id="mode-gallery" class="mode">
       <div id="gallery"></div>
     </div>
-    <div id="mode📊" class="mode">TABLE VIEW</div>
-    <div id="mode⚙️" class="mode">
-      <button onclick="fileFolderPickButton()">fileFolderPick</button>
-      <button onclick="inventoryLoadButton()">inventoryLoad</button>
+    <div id="mode-table" class="mode">TABLE VIEW</div>
+    <div id="mode-settings" class="mode">
+      <button onclick="fileFolderPickButton()">directoryPick</button>
+      <button onclick="inventoryLoadButton()">uiLoad</button>
       <div>
         <textarea id="schemaTextarea" placeholder="Schema JSON"></textarea>
         <button onclick="schemaLoadButton()">schemaLoad</button>
@@ -383,15 +378,13 @@ button {
       <textarea id="output" readonly style="width: 100%; font-family: monospace; font-size: 12px; overflow-y: auto;"></textarea>
     </div>
   </div>
-  <div class="mode-navigation">
-    <button class="mode-btn" onclick="uiBack()">⬅️</button>
-    <button class="mode-btn" onclick="uiNext()">➡️</button>
+  <div class="fixed-controls mode-controls">
+    <button onclick="uiBack()">⬅️</button>
+    <button onclick="uiNext()">➡️</button>
   </div>
   <div id="wizardOverlay">
-    <div id="wizardPanels" class="wizardPane">
-    </div>
-    <div id="wizardNavi">
-    </div>
+    <div id="wizardPanels" class="wizardPane"></div>
+    <div id="wizardNavi"></div>
   </div>
 <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
 <script>eruda.init();</script>
@@ -405,14 +398,22 @@ function log(...msgs) {
   outputBox.value += `[${new Date().toISOString()}] ${message}\n`;
   outputBox.scrollTop = outputBox.scrollHeight;
 }
-window.onload = async function init() {
-  uiRender();
-  await Camera.init();
-}
+async function init() {
+  try {
+    await fileFolderPickButton();
+    await schemaLoadButton();
+    await schemaLearnButton();
+    await inventoryLoadButton();
+    uiRender();
+    await Camera.init();
+  } catch (e) {
+    log(`❌ init failed: ${e.message}`);
+  }
+} window.onload = init;
 log('script start');
 /***** LOW LEVEL I/O OPERATIONS *****/
 let folder;
-async function fileCheck(filename) {
+async function directoryCheck(filename) {
   try {
     await folder.getFileHandle(filename);
     return true;
@@ -423,13 +424,13 @@ async function fileCheck(filename) {
   }
 }
 async function fileRead(filename) {
-  log(`↘️fileRead`);
+  log(`↘️fileRead: ${filename}`);
   const handle = await folder.getFileHandle(filename);
   return await handle.getFile();
 }
-async function fileWrite(filename, data, allowOverwrite = false) {
-  log(`↘️fileWrite`);
-  if (!allowOverwrite && await fileCheck(filename)) {
+async function fileCreate(filename, data, allowOverwrite = false) {
+  log(`↘️fileCreate: ${filename}`);
+  if (!allowOverwrite && await directoryCheck(filename)) {
     throw new Error(`Exists: ${filename}`);
   }
   const handle = await folder.getFileHandle(filename, {create: true});
@@ -437,49 +438,56 @@ async function fileWrite(filename, data, allowOverwrite = false) {
   await writer.write(data);
   await writer.close();
 }
-async function fileDelete(filename) {
-  log(`↘️fileDelete`);
+async function fileDestroy(filename) {
+  log(`↘️fileDestroy: ${filename}`);
   await folder.removeEntry(filename);
 }
-async function fileRename(oldPath, newPath) {
-  log(`↘️fileRename`);
-  if (await fileCheck(newPath)) {
+async function fileUpdate(oldPath, newPath) {
+  log(`↘️fileUpdate: ${oldPath} -> ${newPath}`);
+  if (await directoryCheck(newPath)) {
     throw new Error(`Destination exists: ${newPath}`);
   }
   try {
     const data = await fileRead(oldPath);
-    await fileWrite(newPath, data);
+    await fileCreate(newPath, data);
   } 
   catch (e) {
-    log(`❌ fileRename, copy fail: `, ...arguments, e.message);
+    log(`❌ fileUpdate, copy fail: `, ...arguments, e.message);
     throw new Error(`Copy failed: ${e.message}`);
   }
   try {
-    await fileDelete(oldPath);
+    await fileDestroy(oldPath);
   } 
   catch (e) {
-    log(`❌ fileRename, delete fail: `, ...arguments, e.message);
+    log(`❌ fileUpdate, delete fail: `, ...arguments, e.message);
     throw new Error(`Rename incomplete: ${newPath} created, ${oldPath} remains`);
   }
 }
-async function fileListAll() {
-  log(`↘️fileListAll`);
+async function directoryList() {
+  log(`↘️directoryList`);
   const files = [];
   for await (const [name, handle] of folder.entries()) {
     if (handle.kind === 'file') files.push(name);
   }
   return files;
 }
+async function directoryPick() {
+  log(`↘️directoryPick`);
+  folder = await window.showDirectoryPicker();
+}
 async function fileFind(uuid) {
-  log(`↘️fileFind`);
-  const reconstructedFilename = metadataToName(inventory[uuid]?.metadata);
-  if (reconstructedFilename && await fileCheck(reconstructedFilename)) {
-    return reconstructedFilename;
+  log(`↘️fileFind: ${uuid}`);
+  const metadata = inventory[uuid];
+  if (metadata) {
+    const reconstructedFilename = fileFromInventory(uuid, metadata);
+    if (await directoryCheck(reconstructedFilename)) {
+      return reconstructedFilename;
+    }
   }
-  const candidateFiles = (await fileListAll()).filter(filename => 
+  const candidateFiles = (await directoryList()).filter(filename => 
     filename.match(`_${uuid}\\.`)
   );
-  log(`fileFind: `, candidateFiles);
+  log(`fileFind candidates: `, candidateFiles);
   if (!candidateFiles.length) return null;
   if (candidateFiles.length === 1) return candidateFiles[0];
   const filesWithTimestamps = await Promise.all(
@@ -492,80 +500,155 @@ async function fileFind(uuid) {
     .sort((a, b) => b.lastModified - a.lastModified)[0]
     .filename;
 }
-async function fileFolderPick() {
-  log(`↘️fileFolderPick`);
-  folder = await window.showDirectoryPicker();
-}
 async function fileFolderPickButton() {
-  try {fileFolderPick();}
+  try {directoryPick();}
   catch (e) {log("fileFolderPickButton: ", e.message);}
 }
-/***** UUID catalogue *****/
-let inventory = {};
-async function inventorySave(imageData, metadata) {
-  log(`↘️inventorySave`);
-  const filename = metadataToName(metadata);
-  const response = await fetch(imageData);
-  const blob = await response.blob();
-  await fileWrite(filename, blob);
-  return filename;
+function metadataUUID() {
+  log(`↘️metadataUUID`);
+  const now = new Date();
+  const year = now.getFullYear();                             //4
+  const month = String(now.getMonth() + 1).padStart(2, '0');  //2
+  const day = String(now.getDate()).padStart(2, '0');         //2
+  const hour = String(now.getHours()).padStart(2, '0');       //2
+  const min = String(now.getMinutes()).padStart(2, '0');      //2
+  const sec = String(now.getSeconds()).padStart(2, '0');      //2
+  const mil = String(now.getMilliseconds()).padStart(3, '0'); //3
+  return `${year}${month}${day}${hour}${min}${sec}${mil}`;    //4+2+2+2+2+2+3 = 17
 }
-async function inventoryCapture(rapid=true) {
-  log(`↘️inventoryCapture`);
+//function extractUUIDFromFilename(filename) { //DELETE THIS ABOMINATION
+//  log(`↘️extractUUIDFromFilename: ${filename}`);
+//  const match = filename.match(/_(\d{17})\./);
+//  return match ? match[1] : null;
+//}
+// Returns: {uuid: "...", metadata: {ext: "...", values: [...]}}
+function inventoryFromFile(filename, schema = schemaGet()) {
+  log(`↘️inventoryFromFile: ${filename}`);
   try {
-    if (!Camera.Ok()) {
-      await Camera.init();
+    const parts = filename.split('_');
+    const lastPart = parts.pop();
+    const [uuid, ext] = lastPart.split('.');
+    if (!/^\d{17}$/.test(uuid)) {
+      throw new Error("Bad UUID!");
     }
-    const imageData = Camera.capture();
-    const metadata = metadataDefault();
-    if (uiWizardToggle) metadata.values = await Wizard.record();
-    const filename = await inventorySave(imageData, metadata);
-    const uuid = inventoryUpdate(filename, metadata);
-    log(`📸 ${filename}`);
-    return uuid;
-  } 
+    const values = parts.map((part, index) => {
+      if (schema?.[index]?.type === 'multiple') {
+        return part.split(',');
+      } else {
+        return [part];
+      }
+    });
+    return {
+      uuid: {
+        ext: ext,
+        values: values
+      }
+    };
+  }
   catch (e) {
-    log(`❌ inventoryCapture: `, ...arguments, e.message);
-    if (!Camera.stream?.active) { Camera.stream = null; }
+    log(`❌ inventoryFromFile: `, ...arguments, e.message);
     return null;
   }
 }
-function inventoryCaptureButtonFast() {
-  log(`↘️inventoryCaptureButtonFast`);
-  try {inventoryCapture('rapid');}
-  catch(e) {log(e.message);}
+// Takes: uuid (string), metadata ({ext, values})
+// Returns: filename (string)
+function fileFromInventory(uuid) {
+  log(`↘️fileFromInventory: ${uuid}`);
+  const parts = inventory[files].values.map(valueArray => valueArray.join(','));
+  return [...parts, uuid].join('_') + '.' + metadata.ext;
 }
-function inventoryCaptureButtonSlow() {
-log(`↘️inventoryCaptureButtonFast`);
-  try {inventoryCapture();}
-  catch(e) {log(e.message);}
+function metadataDefault() {
+  log(`↘️metadataDefault`);
+  return {
+    ext: "jpg",
+    values: schemaGet().map(() => [])
+  };
 }
-// NEEDS CHANGE: Atomic operation, metadata and filename must be in sync.
-function inventoryUpdate(filename, metadata) {
-  log(`↘️inventoryUpdate`);
-  const uuid = metadata.data.UUID;
-  inventory[uuid] = { metadata, original: filename };
-  return uuid;
+/***** UUID CATALOGUE (INVENTORY) *****/
+let inventory = {};
+async function inventoryCreate(uuid, metadata, imageData) {
+  log(`↘️inventoryCreate: ${uuid}`);
+  const filename = fileFromInventory(uuid, metadata);
+  const response = await fetch(imageData);
+  const blob = await response.blob();
+  await fileCreate(filename, blob);
+  inventory[uuid] = {
+    ext: metadata.ext,
+    values: metadata.values,
+    thumbnail: null
+  };
+  return filename;
 }
-async function inventoryLoad() {
-  log(`↘️inventoryLoad`);
-  const filenames = await fileListAll();
+function inventoryRead(uuid) {  //This function isvalo supposed to update tevinventorybobject withbresoectvto the filename/gilebsysten reoresenntatiob
+  log(`↘️inventoryRead: ${uuid}`);
+  return inventory[uuid];
+}
+// NEEDS CHANGE: Atomic operation, metadata and filename must be in
+async function inventoryUpdate(uuid, newMetadata) {
+  log(`↘️inventoryUpdate: ${uuid}`);
+  const oldMetadata = inventory[uuid];
+  const oldFilename = fileFromInventory(uuid, oldMetadata);
+  const newFilename = fileFromInventory(uuid, newMetadata);
+  
+  await fileUpdate(oldFilename, newFilename);
+  
+  inventory[uuid] = {
+    ext: newMetadata.ext,
+    values: newMetadata.values,
+    thumbnail: oldMetadata.thumbnail  // preserve thumbnail
+  };
+}
+// DESTROY
+async function inventoryDestroy(uuid) {
+  log(`↘️inventoryDestroy: ${uuid}`);
+  const metadata = inventory[uuid];
+  const filename = fileFromInventory(uuid, metadata);
+  await fileDestroy(filename);
+  delete inventory[uuid];
+}
+async function uiLoad() {
+  log(`↘️uiLoad`);
+  const filenames = await directoryList();
   const schema = schemaGet();
   inventory = {};
   for (const filename of filenames) {
-    const metadata = metadataFromName(filename, schema);
-    if (metadata?.data?.UUID) {
-      inventory[metadata.data.UUID] = {
-        metadata: metadata,
-        original: filename
+    const parsed = inventoryFromFile(filename, schema);
+    if (Object.keys(parsed).length > 0) {
+      const [[uuid, valuesData]] = Object.entries(parsed);
+      const ext = filename.split('.').pop();
+      inventory[uuid] = {
+        ext: ext,
+        values: valuesData,
+        thumbnail: null
       };
     }
   }
 }
 function inventoryLoadButton() {
   log(`↘️inventoryLoadButton`);
-  try {inventoryLoad();}
+  try {uiLoad();}
   catch (e) {log(`inventoryLoadButton: `, e.message);}
+}
+/***** HIGH-LEVEL CAPTURE *****/
+async function uiCapture(rapid = true) {
+  log(`↘️uiCapture`);
+  try {
+    if (!Camera.Ok()) {
+      await Camera.init();
+    }
+    const imageData = Camera.capture();
+    const uuid = metadataUUID(); 
+    const metadata = metadataDefault();
+    if (uiWizardToggle) {metadata.values = await Wizard.record();}
+    const filename = await inventoryCreate(uuid, metadata, imageData);
+    inventory[uuid].thumbnail = await galleryThumbnailCreate(imageData);
+    log(`📸 ${filename}`);
+  } 
+  catch (e) {
+    log(`❌ uiCapture: `, e.message);
+    if (!Camera.stream?.active) { Camera.stream = null; }
+    return null;
+  }
 }
 /***** CAMERA *****/
 const Camera = {
@@ -579,17 +662,14 @@ const Camera = {
     log(`↘️Camera.init()`);
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' }
-        }
+        video: { facingMode: { ideal: 'environment' } }
       });
       this.video = document.getElementById('camera');
       this.video.srcObject = this.stream;
       this.track = this.stream.getVideoTracks()[0];
       await new Promise((resolve, reject) => {
-        // Use once: true to automatically remove the listener after it fires once
         this.video.addEventListener('loadedmetadata', resolve, { once: true });
-        setTimeout(() => reject(new Error("Camera stream metadata load timeout.")), 5000); 
+        setTimeout(() => reject(new Error("Camera stream metadata load timeout.")), 5000);
       });
     } catch (e) {
       log(`❌ Camera.init() failed: `, e.message);
@@ -598,10 +678,15 @@ const Camera = {
   },
   async flip() {
     log(`↘️Camera.flip()`);
-    this.stream?.getTracks().forEach(t => t.stop());
-    const side = this.track?.getSettings()?.facingMode || 'environment';
+    const currentMode = this.track?.getSettings()?.facingMode || 'environment';
+    if (this.stream) {
+      this.stream.getTracks().forEach(t => t.stop());
+      this.stream = null;
+      this.track = null;
+    }
+    const newMode = (currentMode === 'environment') ? 'user' : 'environment';
     this.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: (side === 'environment') ? 'user' : 'environment'} }
+      video: { facingMode: { ideal: newMode } }
     });
     this.video.srcObject = this.stream;
     this.track = this.stream.getVideoTracks()[0];
@@ -634,51 +719,57 @@ const Camera = {
 function cameraFlipButton() {
   log(`↘️cameraFlipButton`);
   try {Camera.flip();}
-  catch(e) {log(`❌ cameraFlipButton: `, e.message);}
+  catch (e) {log(`❌ cameraFlipButton: `, e.message);}
 }
 function cameraTorchButton() {
   log(`↘️cameraTorchButton`);
   try {Camera.torch();}
-  catch(e) {log(`❌ cameraTorchButton: `, e.message);}
+  catch (e) {log(`❌ cameraTorchButton: `, e.message);}
 }
 /***** UI OPERATIONS *****/
-const uiModes = ['📸', '🖼️', '📊', '⚙️'];
-let uiCurrent = 📸;
+const uiModes = {
+  'mode-camera': '📸',
+  'mode-gallery': '🖼️',
+  'mode-table': '📊',
+  'mode-settings': '⚙️'
+};
+const uiArray = Object.keys(uiModes);
+let uiIndex = 0;
 let uiWizardToggle = false;
-function uiWizardToggler() {
-  log(`↘️uiWizardToggler`);
-  uiWizardToggle = !uiWizardToggle
-  const btn = event.target;
-  btn.textContent = (uiWizardToggle) ? '⚡' : '🐌';
-}
 function uiNext() {
-    log(`↘️uiNext`);
-    const index = uiModes.indexOf(uiCurrent);;
-    uiCurrent = uiModes[(index + 1) % uiModes.length];
-    uiRender();
-    Wizard.kill();
+  log(`↘️uiNext`);
+  uiIndex = (uiIndex + 1) % uiArray.length;
+  uiRender();
+  Wizard.kill();
 }
 function uiBack() {
-    log(`↘️uiBack`);
-    const index = uiModes.indexOf(uiCurrent);;
-    uiCurrent = uiModes[(index + uiModes.length - 1) % uiModes.length];
-    uiRender();
-    Wizard.kill();
+  log(`↘️uiBack`);
+  uiIndex = uiIndex ? uiIndex - 1 : uiArray.length - 1;
+  uiRender();
+  Wizard.kill();
 }
 function uiRender() {
   log(`↘️uiRender`);
+  const name = uiArray[uiIndex];
   document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
-  document.getElementById(`mode${uiCurrent}`).classList.add('active');
-  document.getElementById('modeBtn').textContent = uiModes[uiCurrent];
-  if (uiCurrent === 🖼️) {
-    galleryLoad();
-  }
+  document.getElementById(name).classList.add('active');
+  if (name === 'mode-gallery') galleryLoad();
+}
+function uiWizardToggler() {
+  log(`↘️uiWizardToggler`);
+  uiWizardToggle = !uiWizardToggle;
+  const buttons = document.querySelectorAll('.camera-controls button');
+  buttons.forEach(btn => {
+    if (btn.onclick?.toString().includes('uiWizardToggler')) {
+      btn.textContent = uiWizardToggle ? '⚡' : '🐌';
+    }
+  });
 }
 /***** DYNAMIC SCHEMA SYSTEM *****/
-// RESILIENT PARSING + DEFAULTS: schemaLoad should return default schema structure if all files fail, not empty string. schemaAnalyze should continue processing remaining files when individual metadataFromName calls fail, logging specific problematic filenames. SchemaLearn should never throw - always produce usable schema.
+// RESILIENT PARSING + DEFAULTS: schemaLoad should return default schema structure if all files fail, not empty string. schemaAnalyze should continue processing remaining files when individual inventoryFromFile calls fail, logging specific problematic filenames. SchemaLearn should never throw - always produce usable schema.
 let schemaText = document.getElementById('schemaTextarea');
 schemaText.value = '[]';
-schemaText.addEventListener('input', ()=>{schemaDirty=true;});
+schemaText.addEventListener('input', () => { schemaDirty = true; });
 let schemaDirty = false;
 const SCHEMANAME = 'schema.json';
 // NEEDS CHANGE: Should use fileRead function for consistency. Should not throw - return default schema object if all loads fail.
@@ -691,7 +782,7 @@ async function schemaLoad() {
     return content;
   } 
   catch (e) {
-    log(`❌ schemaLoad: `, ...arguments, e.message);
+    log(`❌ schemaLoad: `, e.message);
     return '[]';
   }
 }
@@ -702,13 +793,13 @@ async function schemaLoadButton() {
 }
 async function schemaSave() {
   log(`↘️schemaSave`);
-  await fileWrite(SCHEMANAME, schemaText.value, true);
+  await fileCreate(SCHEMANAME, schemaText.value, true);
   log(`💾 Schema saved to ${SCHEMANAME}`);
 }
 function schemaSaveButton() {
   log(`↘️schemaSaveButton`);
   try {schemaSave(); schemaDirty=false;}
-  catch(e) {log(`❌ schemaSaveButton: `, ...arguments, e.message);}
+  catch(e) {log(`❌ schemaSaveButton: `, e.message);}
 }
 function schemaMergeOptions(fieldoptions1, fieldoptions2) {
   log(`↘️schemaMergeOptions`);
@@ -745,23 +836,27 @@ function analyzeFieldPattern(collection) {
       tokens.add(item);
     }
   });
-  const fieldType = hasText ? 'text' : 
-                    hasMultiple ? 'multiple' : 
-                    'single';
+  const fieldType = 
+    hasText ? 'text' : 
+    hasMultiple ? 'multiple' : 
+    'single';
   const result = { type: fieldType };
   if (fieldType !== 'text') {
     result.options = [...tokens];
   }
   return result;
 }
-// wrap metadataFromName in try catch to keep analysis running even with one bad file
+// wrap inventoryFromFile in try catch to keep analysis running even with one bad file
 function schemaAnalyze(filenames) {
   log(`↘️schemaAnalyze`);
   const imageFiles = filenames.filter(f => 
     f.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)
   );
   const allMetadata = imageFiles
-    .map(filename => metadataFromName(filename, null))
+    .map(filename => {
+      const parsed = inventoryFromFile(filename, null);
+      return parsed ? parsed.metadata : null;
+    })
     .filter(metadata => metadata !== null);
   if (allMetadata.length === 0) return [];
   const maxFields = Math.max(...allMetadata.map(m => m.values.length));
@@ -809,7 +904,7 @@ function schemaFuse(schema1, schema2) {
 }
 async function schemaLearn() {
   log(`↘️schemaLearn`);
-  const fileList = await fileListAll();
+  const fileList = await directoryList();
   if (fileList.length === 0) {
     log('ℹ️ No files found for learning');
     return;
@@ -825,7 +920,7 @@ async function schemaLearn() {
 function schemaLearnButton() {
   log(`↘️schemaLearnButton`);
   try {schemaLearn(); schemaDirty=true;}
-  catch(e) {log(`❌ schemaLearnButton`, ...arguments, e.message);}
+  catch(e) {log(`❌ schemaLearnButton`, e.message);}
 }
 async function schemaInit() {
   log(`↘️schemaInit`);
@@ -838,7 +933,7 @@ function schemaFromText(text) {
   try {
     if (text == null) throw new Error(`Bit nothin`);
     const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : []; // ensure array
+    return Array.isArray(parsed) ? parsed : [];
   } 
   catch (e) {
     log(`❌ schemaFromText:`, ...arguments, e.message);
@@ -852,7 +947,7 @@ function schemaToText(schema) {
     return JSON.stringify(schema, null, 2);
   } 
   catch (e) {
-    log("❌schemaToText:", ...arguments, e.message);
+    log("❌ schemaToText: ", e.message);
     return '';
   }
 }
@@ -860,63 +955,7 @@ function schemaGet() {
   log(`↘️schemaGet`);
   return schemaFromText(schemaText.value);
 }
-//<button onclick="schemaValidate()?log('✅ Schema is valid'):log('❌ Schema validation failed');">Learn</button>
-/***** FILENAME OPERATIONS *****/
-function metadataUUID() {
-  log(`↘️metadataUUID`);
-  const now = new Date();
-  const year = now.getFullYear();                             //4
-  const month = String(now.getMonth() + 1).padStart(2, '0');  //2
-  const day = String(now.getDate()).padStart(2, '0');         //2
-  const hour = String(now.getHours()).padStart(2, '0');       //2
-  const min = String(now.getMinutes()).padStart(2, '0');      //2
-  const sec = String(now.getSeconds()).padStart(2, '0');      //2
-  const mil = String(now.getMilliseconds()).padStart(3, '0'); //3
-  return `${year}${month}${day}${hour}${min}${sec}${mil}`;    //4+2+2+2+2+2+3 = 17
-}
-function metadataFromName(filename, schema=schemaGet()) {
-  log(`↘️metadataFromName`);
-  try {
-    const parts = filename.split('_');
-    const [uuid, ext] = parts.pop().split('.');
-    if (!/^\d{17}$/.test(uuid)) {
-      throw new Error("Bad UUID!");
-    }
-    const values = parts.map((part, index) => {
-      // Default fallback handles full/incomplete/invalid schema
-      if (schema?.[index]?.type === 'multiple') {
-        return part.split(',');
-      } else {  // 'single', 'text', or unknown/inferred
-        return [part];
-      }
-    });
-    return {
-      data: { UUID: uuid, ext: ext },
-      values: values
-    };
-  }
-  catch (e) {
-    log(`❌ metadataFromName: `, ...arguments, e.message);
-    return null;
-  }
-}
-// AI SLOP: NEEDS CHANGE: Should never fail - return minimal metadata with single empty field if schema loading fails
-function metadataToName(metadata) {
-  log(`↘️metadataToName`);
-  const parts = metadata.values.map(valueArray => valueArray.join(','));
-  return [...parts, metadata.data.UUID].join('_') + '.' + metadata.data.ext;
-}
-// Does this function even need to hold the same size? Leave values as empty array?
-
-function metadataDefault() {
-  log(`↘️metadataDefault`);
-  return {
-    data: { UUID: metadataUUID(), ext: "jpg" },
-    values: schemaGet().map(() => [])
-  };
-}
 /***** GALLERY *****/
-let thumbnailCache = {};
 const CACHENAME = 'cache.json';
 async function galleryLoad() {
   log(`↘️galleryLoad`);
@@ -926,7 +965,7 @@ async function galleryLoad() {
     await cacheLoad();
     for (const uuid in inventory) {
       await new Promise(resolve => requestAnimationFrame(resolve));
-      if (uiCurrent !== 🖼️) return;
+      if (uiArray[uiIndex] !== 'mode-gallery') return;
       const thumbnailDataURL = await galleryThumbnailGet(uuid);
       if (thumbnailDataURL) {
         const galleryImg = galleryImageElementCreate(uuid, thumbnailDataURL);
@@ -936,7 +975,7 @@ async function galleryLoad() {
     await cacheSave();
   } 
   catch (e) {
-    log(`❌ galleryLoad: `, ...arguments, e.message);
+    log(`❌ galleryLoad: `, e.message);
   }
 }
 // prevent single image failure from breaking entire gallery
@@ -954,12 +993,12 @@ async function cacheLoad() {
     return cacheData;
   } 
   catch (e) {
-    log(`❌ cacheLoad: `, ...arguments, e.message);
+    log(`❌ cacheLoad:`, e.message);
     return {};
   }
 }
 async function cacheSave() {
-  log(`↘️cameraSave`);
+  log(`↘️cacheSave`);
   try {
     const cacheData = {};
     for (const uuid in inventory) {
@@ -970,29 +1009,26 @@ async function cacheSave() {
       }
     }
     const cacheJSON = JSON.stringify(cacheData);
-    const blob = new Blob([cacheJSON], {type: 'application/json'});
-    await fileWrite(CACHENAME, blob);
+    const blob = new Blob([cacheJSON], {type: 'application/json' });
+    await fileCreate(CACHENAME, blob, true);
   } 
   catch (e) {
-    log(`❌ cacheSave: `, ...arguments, e.message);
+    log(`❌ cacheSave:`, e.message);
   }
 }
 // no error handling, let error fly
 async function galleryThumbnailGet(uuid) {
-  log(`↘️galleryThumbnailGet`);
-  if (inventory[uuid] && inventory[uuid].thumbnail) {
-    return inventory[uuid].thumbnail; //use existing thumbnail
+  log(`↘️galleryThumbnailGet: ${uuid}`);
+  if (inventory[uuid]?.thumbnail) {
+    return inventory[uuid].thumbnail;
   }
   const filename = await fileFind(uuid);
   if (!filename) {
-    log(`galleryThumbnailGet: ${uuid}`);
+    log(`❌ galleryThumbnailGet: file not found for ${uuid}`);
     return null;
   }
   const file = await fileRead(filename);
   const thumbnailDataURL = await galleryThumbnailCreate(file);
-  if (!inventory[uuid]) {
-    inventory[uuid] = {};
-  }
   inventory[uuid].thumbnail = thumbnailDataURL;
   return thumbnailDataURL;
 }
@@ -1016,7 +1052,7 @@ async function galleryThumbnailCreate(file) {
   });
 }
 function galleryImageElementCreate(uuid, thumbnailDataURL) {
-  log(`↘️galleryImageElementCreate`);
+  log(`↘️galleryImageElementCreate: ${uuid}`);
   const galleryImg = document.createElement('img');
   galleryImg.src = thumbnailDataURL;
   galleryImg.className = 'gallery-item';
@@ -1024,7 +1060,7 @@ function galleryImageElementCreate(uuid, thumbnailDataURL) {
   galleryImg.onclick = async () => {
     const filename = await fileFind(uuid);
     if (!filename) {
-      log(`galleryImageElementCreate: ${uuid}`);
+      log(`❌ galleryImageElementCreate: ${uuid}`);
       return;
     }
     const file = await fileRead(filename);
@@ -1127,7 +1163,7 @@ const Wizard = (function() {
       const availableWidth = window.innerWidth;
       log(availableHeight);
       log(availableWidth);
-      const grid = gridSizer(field.options.length, availableWidth/availableHeight);
+      const grid = gridSizer(field.options.length, availableWidth / availableHeight);
       screen.style.cssText = `grid-template-columns:repeat(${grid.cols},1fr);grid-template-rows:repeat(${grid.rows},1fr)`;
       field.options.forEach((option, optionIndex) => {
         const input = document.createElement('input');
@@ -1164,23 +1200,24 @@ const Wizard = (function() {
       });
     }
   }
-  function mergeMetadata(metadata1, metadata2) {
-    log(`↘️mergeMetadata`);
-    const mergedResult = { ...metadata1 , ...metadata2 };
-    mergedResult.data = {...metadata1.data, ...metadata2.data};
-    const isEmptyArray = x => Array.isArray(x) && x.length === 0;
-    const maxLength = Math.max(metadata1.values?.length ?? 0, metadata2.values?.length ?? 0)
-    mergedResult.values = Array.from({ length: maxLength }, (_, i) =>
-      isEmptyArray(metadata2?.values[i]||[]) ?
-        (isEmptyArray(metadata1?.values[i]||[]) ?
-          []
-          :
-         metadata1.values[i])
-        :
-        metadata2.values[i]
-    );
-    return mergedResult;
-  }
+//  AI OMITTED THIS FUNCTION DURING METADATA AND INVENTORY BLUEPRPINT ARCHITECTURE REFACTOR
+//  function mergeMetadata(metadata1, metadata2) {
+//    log(`↘️mergeMetadata`);
+//    const mergedResult = { ...metadata1 , ...metadata2 };
+//    mergedResult.data = {...metadata1.data, ...metadata2.data};
+//    const isEmptyArray = x => Array.isArray(x) && x.length === 0;
+//    const maxLength = Math.max(metadata1.values?.length ?? 0, metadata2.values?.length ?? 0)
+//    mergedResult.values = Array.from({ length: maxLength }, (_, i) =>
+//      isEmptyArray(metadata2?.values[i]||[]) ?
+//        (isEmptyArray(metadata1?.values[i]||[]) ?
+//          []
+//          :
+//         metadata1.values[i])
+//        :
+//        metadata2.values[i]
+//    );
+//    return mergedResult;
+//  }
   function record() {
     log(`↘️Wizard.record`);
     values = [];
@@ -1231,24 +1268,127 @@ log('script end');
 
 
 `````real-command
-Solve the problem in phases and start and end each phase with a set of 20 meditations. Before trying to solve the problem Try multiple times to elaborate in extensive detail on exactly what the problem is, making sure it is consistent with what's actually inside the prompt. There are some problems I'd like you to elaborate on AFTER DOING YOUR FUCKING MEDITATION EXERCISE, NOT BEFORE.
+<preamble>
+Solve the problem in phases and start and end each phase with a set of 20 or more meditations. Before trying to solve the problem Try multiple times to elaborate in extensive detail on exactly what the problem is, making sure it is consistent with what's actually inside the prompt. There are some problems I'd like you to elaborate on AFTER DOING YOUR FUCKING MEDITATION EXERCISE, NOT BEFORE.
 MEDITATE,
 DEFINE PROBLEM,
 
-The grand majority of this code is AI and human generated slop. It's hasn't actually been tested in a browser for 50 commits. Which is fine, it's more of a spec sheet than it is source code. Now I am testing out individual parts. I am now turning it into a fully functioning web app. We're going to keep running unit tests and making sure the components work working on each one until the whole thing works. You're not testing individual functions we are testing components. Now I'm testing this shit IRL.
+The grand majority of this code is AI and human generated slop. It's hasn't actually been tested in a browser for 100 commits. Which is fine, it's more of a spec sheet than it is source code. Now I am testing out individual parts. I am now turning it into a fully functioning web app. We're going to keep running unit tests and making sure the components work working on each one until the whole thing works. You're not testing individual functions we are testing components. Now I'm testing this shit IRL. ... Actually I'm like 30 tests and corrections in now.
+</preamble>
 
-Double check the navigation button system and the camera control button for any code anomalies or anything that might be off.
+We're going through a major refactor on the files and inventory layer, which is also the filename and metadata layer.
+
+The inventory layer functions should be modifying and operating on the global inventory object directly instead of tossing around metadata like a football. They should either be ONE passing around a UUID for inventory object based lookup or be TWO be passing a unitary chopped version of inventory with just one key value pair of UUID and metadata. THESE ARE THE ONLY REPRESENTATIONS THAT SHOULD EXIST within the metadata/inventory layer. Two functions that definitely need this are metadataDefault and inventoryFromFile since they're called before inventory has a box to put them in. Bridge Functions should be Stateless
+( inventoryFromFile(filename) → {uuid: {ext, values}}
+fileFromInventory({uuid: {ext, values}}) → filename ) So within the inventory space there is the inventory object and metadata by itself, but metadata by itself is sparingly used, only by a few functions.
+
+REFACTOR WAS INCOMPLETE. NEEDS FURTHER REFACTORING. REFACTORING PROMPT AND OLD CODE IS REFERENCE AI CONTEXT.
+<refactor>
+# PRIMARY CONCERN:
+Instead of containing a fucking abhorrent copy of the UUID within the actual file name metadata, which is disgusting on so many fucking levels because it's supposed to stop existing within the system, why doesn't it just store a key value pair that has the UUID as the key and the data goes in the value? THIS ALSO APPLIES TO OTHER REDUNDANCIES THAT YOU HAVE RAMPANTLY ABUSED LIKE THE ORIGINAL FILENAME DATA. IF I GIVE YOU THE OPTION TO HAVE THE UUID OR THE ORIGINAL FILE NAME IN THE FILE, YOU WILL ABUSE IT. SHOW ME WHERE THEY ARE. SHOW ME WHERE THE REDUNDANCY LIES SO I CAN KILL IT
+
+LOOK AT THIS SHIT:
+
+OLD VERSION:
+JSON.Stringify(metadata)===`{
+  "data":{
+    //"original":"Bando.BoxA.Pouch._c,t,b_STAY___Gloves are great where fire and workshop usage_202507101532001.png", //Because filename can be and should be reconstructed, and UUID should be only programatic identifier. FUCK!
+    //"UUID":"20250710211532001", IT'S DISGUSTING
+    "ext":"png"
+  },
+  "values":[
+    ["Bando.BoxA.Pouch."],
+    ["c", "t", "b"],
+    ["GET"],
+    [undefined],
+    [undefined],
+    ["Gloves are great where fire and workshop usage"]
+  ]
+}`;
+
+NEW VERSION:
+JSON.Stringify(metadata)===`{
+  "ext":"png",
+  "values":[
+    ["Bando.BoxA.Pouch."],
+    ["c", "t", "b"],
+    ["GET"],
+    [undefined],
+    [undefined],
+    ["Gloves are great where fire and workshop usage"]
+  ]
+}`;
+
+OLD VERSION OF inventoryFromFile return:
+return {
+  data: { UUID: uuid, ext: ext },
+  values: values
+};
+
+NEW VERSION OF inventoryFromFile return:
+return {
+  uuid: {
+    ext: ext,
+    values: values
+  }
+};
+
+FIND ME ALL THE LOCATIONS OF metadata.data.original AND metadata.data.UUID SO I CAN GET RID OF THEM ALL.
+
+Analyze the inventory functions. Should inventory capture, inventory save, and inventory update even be separate functions? I'm also going to be remaking the table area. So the next thing we're going to work on is the table. And in order to do the table, we have to be able to rename the files and update inventory entries. We're in the U of CRUD.
+
+CREATE
+READ
+UPDATE
+DESTROY
+
+Refactoring progress:
+DONE fileFolderPick -> directoryPick
+DONE fileListAll -> directoryList
+DONE inventoryLoad -> uiLoad
+DONE fileCheck -> directoryCheck
+//a bit weird, but here's why. Directory functions are all the functions that operate on THE ENTIRE DIRECTORY
+//the file series functinos deal with single filenames
+//and the inventory functions deal with UUIDs
+DONE inventoryCapture -> uiCapture
+//this is a high level function that incorperates multiple systems, so it doesn't really belong in any one box, that's why it goes up to UI, because UI is for integrative stuff.
+//SHOULD ui be for integrative stuff? I think so. What do you THINK?
+DONE metadataToName -> fileFromInventory
+DONE metadataFromName -> inventoryFromFile
+//These are named like this, because they return the type metadata and filename respectively
+//the metadata space and the UUID space are effectively the same space
+DONE fileWrite -> fileCreate
+DONE inventorySave -> inventoryCreate
+DONE fileRead -> fileRead
+inventoryLoad + fileFind-> ??? -> inventoryRead
+//that one needs to be created, aligns inventory system to filesystem
+fileRename -> fileUpdate
+DONE tinventoryUpdate -> inventoryUpdate
+//alights filesystem to inventory
+DONE fileDelete -> fileDestroy
+????? -> inventoryDestroy
+//inventoryDestroy needs to be created.
+
+THIS CHANGING OF THE BLUEPRINT IS A MAJOR REFACTOR, WHICH INCLUDES EVERYWHERE THE METADATA AND INVENTORY OBJECTS ARE USED, AS WELL AS INCLUDING THE PROCESS OF CHOOSING WHETHER TO USE THE UUID STRING/NUMBER DIRECTLY VERSUS PASSING AROUND THE TRUNCATED INVENTORY OBJECT AS A UNIT PIECE OF METADATA. AND WHICH PARADIGM TO USE NOW BECOMES A POINT OF DISCUSSION AND THOUGHT. THE REASON WHY THE UUID IS USED AS THE KEY FOR THE REST OFT THE DATA IS TO UPHOLD THE "IT IS WHAT IT IS" MENTALITY, WHICH IS A PHILOSOPHY WHICH SHOULD BE PRESENT IN ALL OF THE CODE, TO PREVENT DESYNC ISSUES FROM REDUNDANCY. I ALREADY HAVE TO DEAL WITH THREE FUCKING LAYERS OF REALITY CONTAINED WITHIN ONE PROGRAM. MAKE PREPARATIONS TO REFACTOR THE ENTIRE CODE BASE BUT DO NOT TYPE THEM OUT YET.
+</refactor>
+
+You seem to be confused, so please tell me the two points. Summarize to me the two main points of what I'm trying to do. The two points are as follows. The first point is the structure of the metadata football. Specifically, it's a chopped section of the large inventory object, and is identical in structure to it. The second point is figuring out when and how to use the UID by itself versus the chopped object. I have already given you the answers. All you have to do is restate them to not act a fool.
+
+<postamble>
+Use your meditation spacer tokens to figure out the answer.
+
+
 
 If you make code or solutions, provide it in snippets.
-
-Use your meditation spacer tokens to figure out the answer.
+</postamble>
 `````
 
-
+It's probably a good idea to figure out where you are in the refactor, since a lot has changed and there's a lot of moving parts to Qtrackov.
 
 `````procedure
 STEP 1: MEDITATE.
-STEP 2: DISSECT QUESTION
-STEP 3: MEDITATE
-STEP 4: GAME PLAN THEN EXPLAINERS OR CODE SNIPPETS
+STEP 2: DISSECT QUESTION.
+STEP 3: MEDITATE.
+STEP 4: PREPARE FOR A MAJOR REFACTOR BY DISCUSSING PHILOSOPHY AND MAKING DECISIONS.
+STEP 5: SHUT THE FUCK UP. NO CODE REFACTOR YET.
 `````
