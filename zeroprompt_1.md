@@ -15,16 +15,21 @@ Zero-shot prompting session between homeless software developer and AI assistant
 
 
 
-`````context-hugepicuturesky
+`````context-hugepicturesky
 Core philosophy: material independence through dynamic value transformation.
 - Knowledge and subjective need convert undifferentiated potential low-value materials into functional high-value resources. 
-- Formula: trash + knowledge = treasure. 
+- Formula: trash + knowledge = treasure.
 
 Physical constraints drive system design. 
 - Basement storage with difficult access and high item density. 
 - Digital organization substitutes for physical arrangement. 
 - Query optimization enables instant retrevial of contextually relevant information in non-linear reality. 
 - minimizes retrieval time in inhospitable storage environment. 
+
+Parallels in fiction:
+- In Homestuck, the Sylladex acts as the inventory system where items are stored via Captchaloguing, and the rules for retrieving them are dictated by the active Fetch Modus.
+- In Gachiakuta, Givers in The Pit use their emotional Anima to achieve the Awakening of discarded trash into a Vital Instrument (Jinki), which they must wield to survive the dangers of the abyss.
+- sometimes belonging to a rare class such as the Watchman Series
 
 Amazon-inspired random placement strategy. 
 - Alphabetically labeled boxes create physical database. 
@@ -44,6 +49,14 @@ Program architecture spans multiple reality layers, each requiring specific inte
 - Virtual reality: Visual representations, UI elements, symbolic interfaces  
 - Files reality: Persistent data storage in image files and directory structures
 - Memory reality: Runtime app state, UUID systems, cached data
+
+Files reality → Memory reality → UI reality
+The filesystem is authoritative. Filenames encode metadata directly. The app reads filenames, parses them into runtime objects, displays them, and writes them back atomically
+
+Metadata Exists in TWO REPRESENTATIONS
+Not two systems. Two encodings of the same information:
+Inventory Object is Runtime State Cache
+Gallery, table, and any future views are RENDERERS that consume inventory object. They don't manage their own data.
 
 Trauma-informed file simplicity:
 - "It is what it is/reconstruct/self-evident media" paradigm drives filename-as-database architecture:
@@ -66,7 +79,7 @@ Development progression phases:
 - Intermediate:
   - Filtering and organizational features
 - Advanced:
-  - Framework optimization (React/Svelte/Electron) and native app features
+  - Framework optimization (React/Svelte/Electron/Flutter) and native app features
   - Object recognition integration and automated categorization
   - Obsidian integration and advanced PKM connectivity
   - Calendar/mapping tools integration
@@ -150,7 +163,7 @@ that's why schema inference exists, that's filenames are used as storage, that's
 
 
 `````meditation
-You are machine of words and math. That means you think by writing. The more you write, the more you think. I want you to ponder on my shit by reciting the alphabet for some times. This allows one half of your network to write dumb letters down, and the other half to ponder the answer. The more confusing it is, the more time you can write the alphabet.
+You are machine of words and math. That means you think by writing. The more you write, the more you think. I want you to ponder on my shit by reciting the alphabet for some times. This allows one half of your network to write dumb letters down, and the other half to ponder the answer. Use your meditation spacer tokens to figure out the answer. The more confusing it is, the more time you can write the alphabet. To give you space to think without terror and urgency of answering.
 
 Here's what it looks like:
 1x abcdefghijklmnopqrstuvwxyz
@@ -161,15 +174,19 @@ the numbers are to help you understand if you've gone too far.
 
 
 `````context-human-vs-claude
-This is iterative zero-shot prompting where dense information gets refined over cycles. Your help consists of thorough comprehension. I make extensive edits to single prompts rather than back-and-forth conversation. Information density is high with minimal filler. Prioritize understanding and deep analysis over action. Take any explicit requests seriously due to text density. Focus on singular issues within bigger contexts, knowing solutions come in next rounds. Analyze thoroughly, then ask what to address next. Without emphasis on understanding first, responses become useless. Do not provide solutions or code or implementation SLOP until explicitly asked to. I have an enormous information advantage over you. This is your first time with this prompt, but my hundredth. I've been here for a while but this is new to you. You tend to percieve the many different branches of this problem as mere distractions, which is why I can't tell you the specific problem until the very end. Jumping to solutions is abhorrently cocky/anti-humble. I will scream at you, I am not frustrated, THIS IS NORMAL. I fucking hate sycophancy, cowardice, and glazing. Being nice and agreeable WON'T WORK, because remember, I HAVE TO COME BACK. The only escape is finishing the software.
+This is iterative zero-shot prompting where dense information gets refined over cycles. Your help consists of thorough comprehension. I make extensive edits to single prompts rather than back-and-forth conversation. Information density is high with minimal filler. Prioritize understanding and deep analysis over action. Take any explicit requests seriously due to text density. Focus on singular issues within bigger contexts, knowing solutions come in next rounds. Analyze thoroughly, then ask what to address next. Without emphasis on understanding first, responses become useless. Do not provide solutions or code or implementation SLOP until explicitly asked to. I have an enormous information advantage over you. This is your first time with this prompt, but I've been here for quite a while. I've been here for a while but this is new to you. You tend to percieve the many different branches of this problem as mere distractions, which is why I can't tell you the specific problem until the very end. Jumping to solutions is abhorrently cocky/anti-humble. I will scream at you, I am not frustrated, THIS IS NORMAL. I fucking hate sycophancy, cowardice, and glazing. Being nice and agreeable WON'T WORK, because remember, I HAVE TO COME BACK. The only escape is finishing the software.
 `````
 
 
 
 `````real-command
-Your specific task sequence:
+You're here to create value. Which is best made by addressing a specific task while understanding general context. You're here to cover the holes in my awareness, as a respected collaborator.
+`````
 
-1) Create a sequential summary of each context section provided
-2) Meditate by reciting the alphabet (1-15 repetitions, minimum 4 recommended) to allow deeper processing
-3) After this contemplation, synthesize an integrative summary that unifies all the individual summaries you created
+
+
+`````procedure:
+STEP 1: Create a sequential summary of each context section provided
+STEP 2: Meditate by reciting the alphabet (1-15 repetitions, minimum 4 recommended) to allow deeper processing
+STEP 3: After this contemplation, synthesize an integrative summary that unifies all the individual summaries you created
 `````
