@@ -158,6 +158,9 @@ button:active {
   </style>
 </head>
 <body>
+  <div id="gate" style="position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:9999">
+    <button onclick="init()" style="font-size:4em;padding:40px">📁 PICK FOLDER</button>
+  </div>
   <div id="app">
     <div id="mode-camera" class="mode">
       <video id="camera" autoplay playsinline onclick="uiCapture('rapid')"></video>
@@ -206,6 +209,7 @@ function log(...msgs) {
 async function init() {
   try {
     await fileFolderPickButton();
+    document.getElementById('gate').style.display = 'none';
     await schemaLoadButton();
     await schemaLearnButton();
     await inventoryLoadButton();
@@ -214,7 +218,7 @@ async function init() {
   } catch (e) {
     log(`❌ init failed: ${e.message}`);
   }
-} window.onload = init;
+}
 log('script start');
 /***** LOW LEVEL I/O OPERATIONS *****/
 let folder;
