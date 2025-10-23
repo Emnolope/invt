@@ -285,7 +285,7 @@ async function directoryPick() {
   folder = await window.showDirectoryPicker();
 }
 async function fileFolderPickButton() {
-  try {directoryPick();}
+  try {await directoryPick();}
   catch (e) {log("fileFolderPickButton: ", e.message);}
 }
 function inventoryFromFile(filename) {
@@ -427,7 +427,7 @@ async function inventoryLoad() {
 }
 function inventoryLoadButton() {
   log(`↘️inventoryLoadButton`);
-  try {inventoryLoad();}
+  try {await inventoryLoad();}
   catch (e) {log(`inventoryLoadButton: `, e.message);}
 }
 /***** HIGH-LEVEL CAPTURE *****/
@@ -521,12 +521,12 @@ const Camera = {
 };
 function cameraFlipButton() {
   log(`↘️cameraFlipButton`);
-  try {Camera.flip();}
+  try {await Camera.flip();}
   catch (e) {log(`❌ cameraFlipButton: `, e.message);}
 }
 function cameraTorchButton() {
   log(`↘️cameraTorchButton`);
-  try {Camera.torch();}
+  try {await Camera.torch();}
   catch (e) {log(`❌ cameraTorchButton: `, e.message);}
 }
 /***** UI OPERATIONS *****/
@@ -601,7 +601,7 @@ async function schemaSave() {
 }
 function schemaSaveButton() {
   log(`↘️schemaSaveButton`);
-  try {schemaSave(); schemaDirty=false;}
+  try {await schemaSave(); schemaDirty=false;}
   catch(e) {log(`❌ schemaSaveButton: `, e.message);}
 }
 function schemaMergeOptions(fieldoptions1, fieldoptions2) {
@@ -721,7 +721,7 @@ async function schemaLearn() {
 }
 function schemaLearnButton() {
   log(`↘️schemaLearnButton`);
-  try {schemaLearn(); schemaDirty=true;}
+  try {await schemaLearn(); schemaDirty=true;}
   catch(e) {log(`❌ schemaLearnButton`, e.message);}
 }
 async function schemaInit() {
