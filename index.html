@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v17.32</title>
+  <title>InvtSysShell3+ v18.10</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -425,7 +425,7 @@ async function inventoryLoad() {
     inventory = { ...inventory, ...inventoryFromFile(filename)};
   }
 }
-function inventoryLoadButton() {
+async function inventoryLoadButton() {
   log(`↘️inventoryLoadButton`);
   try {await inventoryLoad();}
   catch (e) {log(`inventoryLoadButton: `, e.message);}
@@ -519,12 +519,12 @@ const Camera = {
     return canvas.toDataURL('image/jpeg');
   }
 };
-function cameraFlipButton() {
+async function cameraFlipButton() {
   log(`↘️cameraFlipButton`);
   try {await Camera.flip();}
   catch (e) {log(`❌ cameraFlipButton: `, e.message);}
 }
-function cameraTorchButton() {
+async function cameraTorchButton() {
   log(`↘️cameraTorchButton`);
   try {await Camera.torch();}
   catch (e) {log(`❌ cameraTorchButton: `, e.message);}
@@ -599,7 +599,7 @@ async function schemaSave() {
   await fileCreate(SCHEMANAME, schemaText.value, true);
   log(`💾 Schema saved to ${SCHEMANAME}`);
 }
-function schemaSaveButton() {
+async function schemaSaveButton() {
   log(`↘️schemaSaveButton`);
   try {await schemaSave(); schemaDirty=false;}
   catch(e) {log(`❌ schemaSaveButton: `, e.message);}
@@ -719,7 +719,7 @@ async function schemaLearn() {
   schemaDirty = true;
   log('🎓 Schema learning complete');
 }
-function schemaLearnButton() {
+async function schemaLearnButton() {
   log(`↘️schemaLearnButton`);
   try {await schemaLearn(); schemaDirty=true;}
   catch(e) {log(`❌ schemaLearnButton`, e.message);}
