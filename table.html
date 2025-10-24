@@ -5,17 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Elegant Mobile Grid</title>
   <style>
-    body {font-family:sans-serif;margin:0;padding:16px;background-color:#f0f0f0}
-    #App {max-width:600px;margin:0 auto;background-color:white;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,.1);padding-bottom:16px}
-    #GridHeader,.Row {display:grid;grid-template-columns:64px repeat(4,1fr);gap:1px;border-bottom:1px solid #eee;align-items:center;font-size:14px;min-height:48px}
-    #GridHeader {font-weight:bold;background-color:#f7f7f7;border-bottom:2px solid #ccc}
-    .Cell {padding:8px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;min-height:24px;user-select:none;-webkit-user-select:none;touch-action:manipulation}
-    .HeaderCell {padding:8px 4px;text-align:center}
-    .ThumbCell {text-align:center}
-    .Thumb {width:48px;height:48px;margin:0 auto;background-color:#4CAF50;color:white;display:flex;align-items:center;justify-content:center;border-radius:4px;font-size:10px}
-    .Selected {background-color:#e0f7fa}
-    .Editing {background-color:#fffde7}
-    input {width:95%;box-sizing:border-box;font-size:14px;padding:4px 2px;border:1px solid #4CAF50;border-radius:3px;outline:none}
+    /* Web 2.0 Plain CSS */
+    body {margin:0;font:14px sans-serif}
+    #GridHeader,.Row {
+      display:grid;
+      grid-template-columns:64px repeat(4,1fr);
+      border-bottom:1px solid #000;
+      min-height:40px;
+      align-items:center
+    }
+    #GridHeader {font-weight:bold;background:#ccc}
+    .Cell {padding:4px;overflow:hidden;white-space:nowrap;user-select:none;touch-action:manipulation}
+    .Thumb {
+      width:40px;height:40px;margin:0 auto;background:#666;color:#fff;
+      display:flex;align-items:center;justify-content:center
+    }
+    /* Stark, clear state indicators */
+    .Selected {background:#8cf} 
+    .Editing {background:#ff8}
+    input {width:98%;box-sizing:border-box;font:inherit;padding:2px;border:1px solid #000}
   </style>
 </head>
 <body>
@@ -23,62 +31,62 @@
     <div id="GridHeader"></div>
     <div id="GridBody"></div>
     <div style="padding:16px;text-align:center">
-      <button onclick="LogSelected()">LOG SELECTED CELL IDs</button>
-      <button onclick="ClearSelection()">CLEAR SELECTION</button>
+      <button onclick="logSelected()">LOG SELECTED CELL IDs</button>
+      <button onclick="clearSelection()">CLEAR SELECTION</button>
     </div>
   </div>
   <script>
     // --- DATA & STATE ---
-    const FieldNames = ['LocationPath', 'Category', 'Flag', 'Note']
-    const DataKeys = {UUID:'data-uuid', ID:'data-cell-id'}
-    const Inventory = {"20250604135552143":{thumbnail:"T1",LocationPath:"Bando.BoxA",Category:"c,t,b",Flag:"GET",Note:"Fire gloves"},"20250604135552144":{thumbnail:"T2",LocationPath:"Bando.BoxB",Category:"h,m",Flag:"INV",Note:"Power tool kit"},"20250604135552145":{thumbnail:"T3",LocationPath:"Shelf.L1",Category:"c",Flag:"PUT",Note:"Spare cables"},"20250604135552146":{thumbnail:"T4",LocationPath:"Rack.Bay2",Category:"t,b",Flag:"GET",Note:"Safety goggles"},"20250604135552147":{thumbnail:"T5",LocationPath:"Desk.Draw3",Category:"m",Flag:"INV",Note:"ID badge laminates"}}
+    const fieldNames = ['LocationPath', 'Category', 'Flag', 'Note']
+    const dataKeys = {uuid:'data-uuid', id:'data-cell-id'}
+    const inventory = {"20250604135552143":{thumbnail:"T1",LocationPath:"Bando.BoxA",Category:"c,t,b",Flag:"GET",Note:"Fire gloves"},"20250604135552144":{thumbnail:"T2",LocationPath:"Bando.BoxB",Category:"h,m",Flag:"INV",Note:"Power tool kit"},"20250604135552145":{thumbnail:"T3",LocationPath:"Shelf.L1",Category:"c",Flag:"PUT",Note:"Spare cables"},"20250604135552146":{thumbnail:"T4",LocationPath:"Rack.Bay2",Category:"t,b",Flag:"GET",Note:"Safety goggles"},"20250604135552147":{thumbnail:"T5",LocationPath:"Desk.Draw3",Category:"m",Flag:"INV",Note:"ID badge laminates"}}
     
-    let SelectedCells = new Set()
-    let EditingCellId = null
-    let PressTimer = null
-    let StartX = 0, StartY = 0
-    const LongPressTime = 500, MoveTolerance = 10
+    let selectedCells = new Set()
+    let editingCellId = null
+    let pressTimer = null
+    let startX = 0, startY = 0
+    const longPressTime = 500, moveTolerance = 10
     const D = document, H = D.getElementById('GridHeader'), B = D.getElementById('GridBody')
 
     // --- LOGGING ---
-    const LogNav = u=>console.log(`Maps:${u}`), LogEdit = (i,v)=>console.log(`EDIT:${i}=${v}`)
-    const LogSelect = ()=>console.log(`SELECT:${SelectedCells.size} [${[...SelectedCells].join(',')}]`)
-    const LogSelected = ()=>console.log('Selected:',[...SelectedCells])
+    const logNav = u=>console.log(`Maps:${u}`), logEdit = (i,v)=>console.log(`EDIT:${i}=${v}`)
+    const logSelect = ()=>console.log(`SELECT:${selectedCells.size} [${[...selectedCells].join(',')}]`)
+    const logSelected = ()=>console.log('Selected:',[...selectedCells])
 
     // --- SELECTION UTILITIES ---
-    const ClearSelection = ()=>{
+    const clearSelection = ()=>{
       D.querySelectorAll('.Selected').forEach(c=>c.classList.remove('Selected'))
-      SelectedCells.clear(); LogSelect()
+      selectedCells.clear(); logSelect()
     }
-    const ToggleSelection = (Element, Id)=>{
-      SelectedCells.has(Id)?SelectedCells.delete(Id):SelectedCells.add(Id)
-      Element.classList.toggle('Selected'); LogSelect()
+    const toggleSelection = (element, id)=>{
+      selectedCells.has(id)?selectedCells.delete(id):selectedCells.add(id)
+      element.classList.toggle('Selected'); logSelect()
     }
 
     // --- RENDERING ---
-    const CreateHeader = ()=>{
+    const createHeader = ()=>{
       H.innerHTML='';
-      ['ACTION',...FieldNames].map(text=>{const c=D.createElement('div');c.className='HeaderCell';c.textContent=text;H.append(c)})
+      ['ACTION',...fieldNames].map(text=>{const c=D.createElement('div');c.className='HeaderCell';c.textContent=text;H.append(c)})
     }
-    const RenderInventory = ()=>{
+    const renderInventory = ()=>{
       B.innerHTML='';
-      Object.entries(Inventory).map(([u,item])=>{
-        const r=D.createElement('div');r.className='Row';r.setAttribute(DataKeys.UUID,u)
+      Object.entries(inventory).map(([u,item])=>{
+        const r=D.createElement('div');r.className='Row';r.setAttribute(dataKeys.uuid,u)
 
         // Leftmost Cell (Navigation)
-        const tc=D.createElement('div');tc.className='Cell ThumbCell';tc.setAttribute(DataKeys.ID,`${u}::t`)
+        const tc=D.createElement('div');tc.className='Cell ThumbCell';tc.setAttribute(dataKeys.id,`${u}::t`)
         const td=D.createElement('div');td.className='Thumb';td.textContent=item.thumbnail
-        tc.onclick=e=>{e.stopPropagation();EditingCellId||LogNav(u)};tc.append(td);r.append(tc)
+        tc.onclick=e=>{e.stopPropagation();editingCellId||logNav(u)};tc.append(td);r.append(tc)
 
         // Data Cells (Select/Edit)
-        FieldNames.map(f=>{
+        fieldNames.map(f=>{
           const c=D.createElement('div'),i=`${u}::${f}`
-          c.className='Cell DataCell';c.setAttribute(DataKeys.ID,i);c.textContent=item[f]
-          SelectedCells.has(i)&&c.classList.add('Selected')
-          c.onclick=e=>HandleTap(e,u,f,i)
-          c.addEventListener('touchstart',HandlePressStart)
-          c.addEventListener('touchmove',HandlePressMove)
-          c.addEventListener('touchend',HandlePressEnd)
+          c.className='Cell DataCell';c.setAttribute(dataKeys.id,i);c.textContent=item[f]
+          selectedCells.has(i)&&c.classList.add('Selected')
+          c.onclick=e=>handleTap(e,u,f,i)
+          c.addEventListener('touchstart',handlePressStart)
+          c.addEventListener('touchmove',handlePressMove)
+          c.addEventListener('touchend',handlePressEnd)
           r.append(c)
         })
         B.append(r)
@@ -86,53 +94,61 @@
     }
 
     // --- EDITING LOGIC ---
-    const SaveEdit = (u,f,Input,MasterCell)=>{
-      const v=Input.value
-      if(SelectedCells.size>0){
-        SelectedCells.forEach(i=>{
+    const saveEdit = (u,f,input,masterCell)=>{
+      const v=input.value
+      if(selectedCells.size>0){
+        selectedCells.forEach(i=>{
           const [tU,tF]=i.split('::')
-          Inventory[tU][tF]=v,LogEdit(i,v)
-          const tE=D.querySelector(`[${DataKeys.ID}="${i}"]`)
+          inventory[tU][tF]=v,logEdit(i,v)
+          const tE=D.querySelector(`[${dataKeys.id}="${i}"]`)
           tE&&(tE.textContent=v,tE.classList.remove('Selected'))
         })
       }else{
-        Inventory[u][f]=v,LogEdit(`${u}::${f}`,v)
+        inventory[u][f]=v,logEdit(`${u}::${f}`,v)
       }
-      MasterCell.innerHTML='',MasterCell.textContent=v,MasterCell.classList.remove('Editing')
-      ClearSelection(),EditingCellId=null
+      masterCell.innerHTML='',masterCell.textContent=v,masterCell.classList.remove('Editing')
+      clearSelection(),editingCellId=null
     }
 
-    const HandleTap = (e,u,f,i)=>{
-      if(EditingCellId)D.querySelector(`[${DataKeys.ID}="${EditingCellId}"] input`).blur()
+    const handleTap = (e,u,f,i)=>{
+      // Defensive: Stop click/tap event from bubbling up to avoid conflicts.
+      e.stopPropagation() 
+
+      if(editingCellId)D.querySelector(`[${dataKeys.id}="${editingCellId}"] input`).blur()
       
       const c=e.currentTarget
-      !SelectedCells.has(i)&&ClearSelection()
+      !selectedCells.has(i)&&clearSelection()
       
-      EditingCellId=i;c.classList.add('Editing')
+      editingCellId=i;c.classList.add('Editing')
       const input=D.createElement('input')
-      input.type='text';input.value=Inventory[u][f]
+      input.type='text';input.value=inventory[u][f]
       c.textContent='';c.append(input);input.focus()
       
-      input.onblur=()=>SaveEdit(u,f,input,c)
-      input.onkeydown=ev=>ev.key==='Enter'&&input.blur()
+      input.onblur=()=>saveEdit(u,f,input,c)
+      
+      // Fix for Backspace: Stop propagation on keydown to ensure input handles the key.
+      input.onkeydown = ev => {
+        ev.stopPropagation()
+        if(ev.key === 'Enter') ev.currentTarget.blur()
+      }
     }
 
     // --- TOUCH/LONG-PRESS LOGIC ---
-    const HandlePressStart = e=>{
-      if(EditingCellId)return clearTimeout(PressTimer),PressTimer=null
-      const c=e.currentTarget,i=c.getAttribute(DataKeys.ID)
-      StartX=e.touches[0].clientX;StartY=e.touches[0].clientY
-      PressTimer=setTimeout(()=>{ToggleSelection(c,i);PressTimer=null},LongPressTime)
+    const handlePressStart = e=>{
+      if(editingCellId)return clearTimeout(pressTimer),pressTimer=null
+      const c=e.currentTarget,i=c.getAttribute(dataKeys.id)
+      startX=e.touches[0].clientX;startY=e.touches[0].clientY
+      pressTimer=setTimeout(()=>{toggleSelection(c,i);pressTimer=null},longPressTime)
     }
-    const HandlePressMove = e=>{
-      if(!PressTimer)return
-      const dx=Math.abs(e.touches[0].clientX-StartX),dy=Math.abs(e.touches[0].clientY-StartY)
-      if(dx>MoveTolerance||dy>MoveTolerance){clearTimeout(PressTimer);PressTimer=null}
+    const handlePressMove = e=>{
+      if(!pressTimer)return
+      const dx=Math.abs(e.touches[0].clientX-startX),dy=Math.abs(e.touches[0].clientY-startY)
+      if(dx>moveTolerance||dy>moveTolerance){clearTimeout(pressTimer);pressTimer=null}
     }
-    const HandlePressEnd = e=>PressTimer&&clearTimeout(PressTimer)
+    const handlePressEnd = e=>pressTimer&&clearTimeout(pressTimer)
 
     // --- INIT ---
-    CreateHeader(); RenderInventory()
+    createHeader(); renderInventory()
   </script>
 </body>
 </html>
