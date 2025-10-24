@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v18.10</title>
+  <title>InvtSysShell3+ v18.11</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -175,7 +175,7 @@ button:active {
     </div>
     <div id="mode-table" class="mode">TABLE VIEW</div>
     <div id="mode-settings" class="mode">
-      <button onclick="fileFolderPickButton()">directoryPick</button>
+      <button onclick="directoryPickButton()">directoryPick</button>
       <button onclick="inventoryLoadButton()">uiLoad</button>
       <div>
         <textarea id="schemaTextarea" placeholder="Schema JSON"></textarea>
@@ -208,7 +208,7 @@ function log(...msgs) {
 }
 async function init() {
   try {
-    await fileFolderPickButton();
+    await directoryPickButton();
     document.getElementById('gate').style.display = 'none';
     await schemaLoadButton();
     await schemaLearnButton();
@@ -282,11 +282,13 @@ async function directoryList() {
 }
 async function directoryPick() {
   log(`↘️directoryPick`);
-  folder = await window.showDirectoryPicker();
+  folder = await window.showDirectoryPicker({
+    mode: 'readwrite'
+  });
 }
-async function fileFolderPickButton() {
+async function directoryPickButton() {
   try {await directoryPick();}
-  catch (e) {log("fileFolderPickButton: ", e.message);}
+  catch (e) {log("directoryPickButton: ", e.message);}
 }
 function inventoryFromFile(filename) {
   const lastUnderscore = filename.lastIndexOf('_');
@@ -743,7 +745,7 @@ function schemaFromText(text) {
   }
 }
 function schemaToText(schema) {
-  log(`↘️schemaToText`);
+  log(`↘️schemaToText `);
   try {
     if (schema == null) throw new Error(`Bit nothin`);
     return JSON.stringify(schema, null, 2);
