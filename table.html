@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elegant Mobile Grid</title>
+  <style>
+    body {font-family:sans-serif;margin:0;padding:16px;background-color:#f0f0f0}
+    #App {max-width:600px;margin:0 auto;background-color:white;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,.1);padding-bottom:16px}
+    #GridHeader,.Row {display:grid;grid-template-columns:64px repeat(4,1fr);gap:1px;border-bottom:1px solid #eee;align-items:center;font-size:14px;min-height:48px}
+    #GridHeader {font-weight:bold;background-color:#f7f7f7;border-bottom:2px solid #ccc}
+    .Cell {padding:8px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;min-height:24px;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+    .HeaderCell {padding:8px 4px;text-align:center}
+    .ThumbCell {text-align:center}
+    .Thumb {width:48px;height:48px;margin:0 auto;background-color:#4CAF50;color:white;display:flex;align-items:center;justify-content:center;border-radius:4px;font-size:10px}
+    .Selected {background-color:#e0f7fa}
+    .Editing {background-color:#fffde7}
+    input {width:95%;box-sizing:border-box;font-size:14px;padding:4px 2px;border:1px solid #4CAF50;border-radius:3px;outline:none}
+  </style>
+</head>
+<body>
+  <div id="App">
+    <div id="GridHeader"></div>
+    <div id="GridBody"></div>
+    <div style="padding:16px;text-align:center">
+      <button onclick="LogSelected()">LOG SELECTED CELL IDs</button>
+      <button onclick="ClearSelection()">CLEAR SELECTION</button>
+    </div>
+  </div>
+  <script>
+    // --- DATA & STATE ---
+    const FieldNames = ['LocationPath', 'Category', 'Flag', 'Note']
+    const DataKeys = {UUID:'data-uuid', ID:'data-cell-id'}
+    const Inventory = {"20250604135552143":{thumbnail:"T1",LocationPath:"Bando.BoxA",Category:"c,t,b",Flag:"GET",Note:"Fire gloves"},"20250604135552144":{thumbnail:"T2",LocationPath:"Bando.BoxB",Category:"h,m",Flag:"INV",Note:"Power tool kit"},"20250604135552145":{thumbnail:"T3",LocationPath:"Shelf.L1",Category:"c",Flag:"PUT",Note:"Spare cables"},"20250604135552146":{thumbnail:"T4",LocationPath:"Rack.Bay2",Category:"t,b",Flag:"GET",Note:"Safety goggles"},"20250604135552147":{thumbnail:"T5",LocationPath:"Desk.Draw3",Category:"m",Flag:"INV",Note:"ID badge laminates"}}
+    
+    let SelectedCells = new Set()
+    let EditingCellId = null
+    let PressTimer = null
+    let StartX = 0, StartY = 0
+    const LongPressTime = 500, MoveTolerance = 10
+    const D = document, H = D.getElementById('GridHeader'), B = D.getElementById('GridBody')
+
+    // --- LOGGING ---
+    const LogNav = u=>console.log(`Maps:${u}`), LogEdit = (i,v)=>console.log(`EDIT:${i}=${v}`)
+    const LogSelect = ()=>console.log(`SELECT:${SelectedCells.size} [${[...SelectedCells].join(',')}]`)
+    const LogSelected = ()=>console.log('Selected:',[...SelectedCells])
+
+    // --- SELECTION UTILITIES ---
+    const ClearSelection = ()=>{
+      D.querySelectorAll('.Selected').forEach(c=>c.classList.remove('Selected'))
+      SelectedCells.clear(); LogSelect()
+    }
+    const ToggleSelection = (Element, Id)=>{
+      SelectedCells.has(Id)?SelectedCells.delete(Id):SelectedCells.add(Id)
+      Element.classList.toggle('Selected'); LogSelect()
+    }
+
+    // --- RENDERING ---
+    const CreateHeader = ()=>{
+      H.innerHTML='';
+      ['ACTION',...FieldNames].map(text=>{const c=D.createElement('div');c.className='HeaderCell';c.textContent=text;H.append(c)})
+    }
+    const RenderInventory = ()=>{
+      B.innerHTML='';
+      Object.entries(Inventory).map(([u,item])=>{
+        const r=D.createElement('div');r.className='Row';r.setAttribute(DataKeys.UUID,u)
+
+        // Leftmost Cell (Navigation)
+        const tc=D.createElement('div');tc.className='Cell ThumbCell';tc.setAttribute(DataKeys.ID,`${u}::t`)
+        const td=D.createElement('div');td.className='Thumb';td.textContent=item.thumbnail
+        tc.onclick=e=>{e.stopPropagation();EditingCellId||LogNav(u)};tc.append(td);r.append(tc)
+
+        // Data Cells (Select/Edit)
+        FieldNames.map(f=>{
+          const c=D.createElement('div'),i=`${u}::${f}`
+          c.className='Cell DataCell';c.setAttribute(DataKeys.ID,i);c.textContent=item[f]
+          SelectedCells.has(i)&&c.classList.add('Selected')
+          c.onclick=e=>HandleTap(e,u,f,i)
+          c.addEventListener('touchstart',HandlePressStart)
+          c.addEventListener('touchmove',HandlePressMove)
+          c.addEventListener('touchend',HandlePressEnd)
+          r.append(c)
+        })
+        B.append(r)
+      })
+    }
+
+    // --- EDITING LOGIC ---
+    const SaveEdit = (u,f,Input,MasterCell)=>{
+      const v=Input.value
+      if(SelectedCells.size>0){
+        SelectedCells.forEach(i=>{
+          const [tU,tF]=i.split('::')
+          Inventory[tU][tF]=v,LogEdit(i,v)
+          const tE=D.querySelector(`[${DataKeys.ID}="${i}"]`)
+          tE&&(tE.textContent=v,tE.classList.remove('Selected'))
+        })
+      }else{
+        Inventory[u][f]=v,LogEdit(`${u}::${f}`,v)
+      }
+      MasterCell.innerHTML='',MasterCell.textContent=v,MasterCell.classList.remove('Editing')
+      ClearSelection(),EditingCellId=null
+    }
+
+    const HandleTap = (e,u,f,i)=>{
+      if(EditingCellId)D.querySelector(`[${DataKeys.ID}="${EditingCellId}"] input`).blur()
+      
+      const c=e.currentTarget
+      !SelectedCells.has(i)&&ClearSelection()
+      
+      EditingCellId=i;c.classList.add('Editing')
+      const input=D.createElement('input')
+      input.type='text';input.value=Inventory[u][f]
+      c.textContent='';c.append(input);input.focus()
+      
+      input.onblur=()=>SaveEdit(u,f,input,c)
+      input.onkeydown=ev=>ev.key==='Enter'&&input.blur()
+    }
+
+    // --- TOUCH/LONG-PRESS LOGIC ---
+    const HandlePressStart = e=>{
+      if(EditingCellId)return clearTimeout(PressTimer),PressTimer=null
+      const c=e.currentTarget,i=c.getAttribute(DataKeys.ID)
+      StartX=e.touches[0].clientX;StartY=e.touches[0].clientY
+      PressTimer=setTimeout(()=>{ToggleSelection(c,i);PressTimer=null},LongPressTime)
+    }
+    const HandlePressMove = e=>{
+      if(!PressTimer)return
+      const dx=Math.abs(e.touches[0].clientX-StartX),dy=Math.abs(e.touches[0].clientY-StartY)
+      if(dx>MoveTolerance||dy>MoveTolerance){clearTimeout(PressTimer);PressTimer=null}
+    }
+    const HandlePressEnd = e=>PressTimer&&clearTimeout(PressTimer)
+
+    // --- INIT ---
+    CreateHeader(); RenderInventory()
+  </script>
+</body>
+</html>
