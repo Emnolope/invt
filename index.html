@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v18.11</title>
+  <title>InvtSysShell3+ v18.11+</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -424,7 +424,8 @@ async function inventoryLoad() {
   const filenames = await directoryList();
   inventory = {}; 
   for (const filename of filenames) {
-    inventory = { ...inventory, ...inventoryFromFile(filename)};
+    try { inventory = { ...inventory, ...inventoryFromFile(filename)}; }
+    catch (e) { log(`inventoryLoad: `, filename, e.message); }
   }
 }
 async function inventoryLoadButton() {
