@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v18.11+</title>
+  <title>InvtSysShell3+ v18.18</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -66,7 +66,8 @@ button:active {
   position: fixed;
   inset: 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
+  padding-top: 80px;
 }
 /***** CAMERA *****/
 #camera {
@@ -85,6 +86,68 @@ button:active {
   aspect-ratio: 1;
   object-fit: cover;
   cursor: pointer;
+}
+/***** TABLE GRID *****/
+#GridHeader, .Row {
+  display: grid;
+  grid-template-columns: 40px 140px 140px 140px 166px; 
+  width: 626px;
+  border-bottom: 1px solid #000;
+  min-height: 16px;
+  align-items: center;
+  font-size: 14px;
+}
+#GridHeader {
+  font-weight: bold;
+  background: #ccc;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.Cell {
+  overflow: hidden;
+  white-space: nowrap;
+  user-select: none;
+  touch-action: manipulation;
+}
+.ThumbCell {
+  text-align: center;
+}
+.Thumb {
+  width: 100%;
+  height: 14px;
+  background: #666;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+.Selected {
+  background: #8cf;
+} 
+.Editing {
+  background: #ff8;
+}
+#mode-table input {
+  width: 98%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0;
+  border: 1px solid #000;
+}
+.table-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 0;
+  margin-top: 10px;
+  width: 626px;
+}
+.table-controls button {
+  font-size: 1em;
+  padding: 5px 10px;
+  border-radius: 4px;
 }
 /***** WIZARD OVERLAY *****/
 #wizardOverlay {
@@ -173,7 +236,16 @@ button:active {
     <div id="mode-gallery" class="mode">
       <div id="gallery"></div>
     </div>
-    <div id="mode-table" class="mode">TABLE VIEW</div>
+    <div id="mode-table" class="mode">
+      <div style="min-width: 626px; font-family: 'Courier New', monospace;">
+        <div id="GridHeader"></div>
+        <div id="GridBody"></div>
+        <div class="table-controls">
+          <button onclick="Table.logSelected()">LOG SELECTED</button>
+          <button onclick="Table.clearSelection()">CLEAR</button>
+        </div>
+      </div>
+    </div>
     <div id="mode-settings" class="mode">
       <button onclick="directoryPickButton()">directoryPick</button>
       <button onclick="inventoryLoadButton()">uiLoad</button>
@@ -560,6 +632,7 @@ function uiRender() {
   document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
   document.getElementById(name).classList.add('active');
   if (name === 'mode-gallery') galleryLoad();
+  if (name === 'mode-table') Table.init();
 }
 function uiWizardToggler() {
   log(`↘️uiWizardToggler`);
@@ -877,6 +950,238 @@ function galleryImageElementCreate(uuid, thumbnailDataURL) {
   };
   return galleryImg;
 }
+/***** TABLE SPREADSHEET *****/
+const Table = (function() {
+  const fieldNames = ['LocationPath', 'Category', 'Flag', 'Note'];
+  const dataKeys = {uuid:'data-uuid', id:'data-cell-id'};
+  
+  let selectedCells = new Set();
+  let editingCellId = null;
+  let pressTimer = null;
+  let startX = 0, startY = 0;
+  const longPressTime = 500, moveTolerance = 10;
+  function clearSelection() {
+    log('↘️Table.clearSelection');
+    document.querySelectorAll('.Selected').forEach(c => c.classList.remove('Selected'));
+    selectedCells.clear();
+  }
+  function toggleSelection(element, id) {
+    log(`↘️Table.toggleSelection: ${id}`);
+    selectedCells.has(id) ? selectedCells.delete(id) : selectedCells.add(id);
+    element.classList.toggle('Selected');
+  }
+  function logSelected() {
+    log('↘️Table.logSelected:', [...selectedCells]);
+  }
+  function createHeader() {
+    log('↘️Table.createHeader');
+    const header = document.getElementById('GridHeader');;
+    header.innerHTML = '';
+    ['ACT', ...fieldNames].forEach(text => {
+      const c = document.createElement('div');
+      c.className = 'HeaderCell Cell';
+      c.textContent = text;
+      header.appendChild(c);
+    });
+  }
+  function parseInventoryToFields(uuid) {
+    log(`↘️Table.parseInventoryToFields: ${uuid}`);
+    const item = inventory[uuid];
+    if (!item) return null;
+    
+    const valuesArray = valuesStringToArray(item.values, schemaGet());
+    
+    // Map valuesArray to fieldNames based on schema
+    const fields = {};
+    const schema = schemaGet();
+    
+    schema.forEach((field, index) => {
+      const fieldValue = valuesArray[index] || [];
+      fields[field.name] = fieldValue.join(',');
+    });
+    return fields;
+  }
+  function saveEdit(uuid, fieldName, input, masterCell) {
+    log(`↘️Table.saveEdit: ${uuid}::${fieldName}`);
+    const newValue = input.value;
+    if (selectedCells.size > 0) {
+      // Batch edit
+      selectedCells.forEach(cellId => {
+        const [targetUuid, targetField] = cellId.split('::');
+        updateInventoryField(targetUuid, targetField, newValue);
+        
+        const targetElement = document.querySelector(`[${dataKeys.id}="${cellId}"]`);
+        if (targetElement) {
+          targetElement.textContent = newValue;
+          targetElement.classList.remove('Selected');
+        }
+      });
+    } else {
+      // Single edit
+      updateInventoryField(uuid, fieldName, newValue);
+    }
+    masterCell.innerHTML = '';
+    masterCell.textContent = newValue;
+    masterCell.classList.remove('Editing');
+    clearSelection();
+    editingCellId = null;
+  }
+  function updateInventoryField(uuid, fieldName, newValue) {
+    log(`↘️Table.updateInventoryField: ${uuid}.${fieldName} = ${newValue}`);
+    
+    const item = inventory[uuid];
+    if (!item) return;
+    
+    const valuesArray = valuesStringToArray(item.values, schemaGet());
+    const schema = schemaGet();
+    
+    // Find field index in schema
+    const fieldIndex = schema.findIndex(f => f.name === fieldName);
+    if (fieldIndex === -1) return;
+    
+    // Update the specific field
+    if (schema[fieldIndex].type === 'multiple') {
+      valuesArray[fieldIndex] = newValue ? newValue.split(',') : [];
+    } else {
+      valuesArray[fieldIndex] = newValue ? [newValue] : [];
+    }
+    
+    // Convert back to string
+    const newValuesString = valuesArrayToString(valuesArray);
+    
+    // Update inventory
+    const oldEntry = {[uuid]: item};
+    const newEntry = {[uuid]: {...item, values: newValuesString}};
+    
+    // Trigger file update
+    inventoryUpdate(newEntry).catch(e => log(`❌ Table.updateInventoryField: ${e.message}`));
+  }
+  
+  function handleTap(e, uuid, fieldName, cellId) {
+    log(`↘️Table.handleTap: ${cellId}`);
+    e.stopPropagation();
+    
+    if (editingCellId) {
+      const editInput = document.querySelector(`[${dataKeys.id}="${editingCellId}"] input`);
+      if (editInput) editInput.blur();
+    }
+    
+    const cell = e.currentTarget;
+    if (!selectedCells.has(cellId)) clearSelection();
+    
+    editingCellId = cellId;
+    cell.classList.add('Editing');
+    
+    const fields = parseInventoryToFields(uuid);
+    const currentValue = fields ? fields[fieldName] : '';
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentValue;
+    cell.textContent = '';
+    cell.appendChild(input);
+    input.focus();
+    
+    input.onblur = () => saveEdit(uuid, fieldName, input, cell);
+    input.onkeydown = ev => {
+      ev.stopPropagation();
+      if (ev.key === 'Enter') ev.currentTarget.blur();
+    };
+  }
+  
+  function handlePressStart(e) {
+    if (editingCellId) return;
+    
+    const cell = e.currentTarget;
+    const cellId = cell.getAttribute(dataKeys.id);
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    
+    pressTimer = setTimeout(() => {
+      toggleSelection(cell, cellId);
+      pressTimer = null;
+    }, longPressTime);
+  }
+  
+  function handlePressMove(e) {
+    if (!pressTimer) return;
+    const dx = Math.abs(e.touches[0].clientX - startX);
+    const dy = Math.abs(e.touches[0].clientY - startY);
+    if (dx > moveTolerance || dy > moveTolerance) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+  }
+  
+  function handlePressEnd(e) {
+    if (pressTimer) clearTimeout(pressTimer);
+  }
+  
+  function renderInventory() {
+    log('↘️Table.renderInventory');
+    const body = document.getElementById('GridBody');;
+    body.innerHTML = '';
+    
+    Object.entries(inventory).forEach(([uuid, item]) => {
+      const row = document.createElement('div');
+      row.className = 'Row';
+      row.setAttribute(dataKeys.uuid, uuid);
+      
+      // Thumbnail cell
+      const thumbCell = document.createElement('div');
+      thumbCell.className = 'Cell ThumbCell';
+      thumbCell.setAttribute(dataKeys.id, `${uuid}::t`);
+      
+      const thumbDiv = document.createElement('div');
+      thumbDiv.className = 'Thumb';
+      thumbDiv.textContent = '📷';
+      
+      thumbCell.onclick = e => {
+        e.stopPropagation();
+        if (!editingCellId) {
+          log(`Navigate to gallery: ${uuid}`);
+          // TODO: Navigate to gallery and focus on this item
+        }
+      };
+      
+      thumbCell.appendChild(thumbDiv);
+      row.appendChild(thumbCell);
+      
+      // Data cells
+      const fields = parseInventoryToFields(uuid);
+      if (!fields) return;
+      
+      fieldNames.forEach(fieldName => {
+        const cell = document.createElement('div');
+        const cellId = `${uuid}::${fieldName}`;
+        cell.className = 'Cell DataCell';
+        cell.setAttribute(dataKeys.id, cellId);
+        cell.textContent = fields[fieldName] || '';
+        
+        if (selectedCells.has(cellId)) cell.classList.add('Selected');
+        
+        cell.onclick = e => handleTap(e, uuid, fieldName, cellId);
+        cell.addEventListener('touchstart', handlePressStart);
+        cell.addEventListener('touchmove', handlePressMove);
+        cell.addEventListener('touchend', handlePressEnd);
+        
+        row.appendChild(cell);
+      });
+      
+      body.appendChild(row);
+    });
+  }
+  function init() {
+    log('↘️Table.init');
+    createHeader();
+    renderInventory();
+  }
+  return {
+    init,
+    clearSelection,
+    logSelected
+  };
+})();
 // DISCUSSION: How to make components more robust?
 // RESILIENT INPUT + NON-BLOCKING: Wizard failures return empty metadata rather than throwing. Input validation warns but doesn't prevent progression. Build functions handle missing schema gracefully.
 /***** WIZARD OVERLAY *****/
