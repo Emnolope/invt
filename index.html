@@ -133,19 +133,6 @@ button:active {
   padding: 0;
   border: 1px solid #000;
 }
-.table-controls {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px 0;
-  margin-top: 10px;
-  width: 626px;
-}
-.table-controls button {
-  font-size: 1em;
-  padding: 5px 10px;
-  border-radius: 4px;
-}
 /***** WIZARD OVERLAY *****/
 #wizardOverlay {
   position: fixed;
@@ -237,10 +224,6 @@ button:active {
       <div style="min-width: 626px; font-family: 'Courier New', monospace;">
         <div id="GridHeader"></div>
         <div id="GridBody"></div>
-        <div class="table-controls">
-          <button onclick="Table.logSelected()">LOG SELECTED</button>
-          <button onclick="Table.clearSelection()">CLEAR</button>
-        </div>
       </div>
     </div>
     <div id="mode-settings" class="mode">
