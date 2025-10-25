@@ -87,47 +87,36 @@ button:active {
   object-fit: cover;
   cursor: pointer;
 }
-/***** TABLE *****/
-#mode-table {
-  overflow-x: auto;
-  font-family: monospace;
+/***** TABLE GRID *****/
+#GridHeader,.Row{
+  display:grid;
+  grid-template-columns:40px repeat(var(--cols),1fr);
+  gap:1px
 }
-#GridHeader, .Row {
-  display: grid;
-  grid-template-columns: 40px repeat(var(--cols), 1fr);
-  gap: 1px;
-  background: #ddd;
+ #GridHeader{
+  position:sticky;
+  top:0;
+  background:#ccc;
+  font-weight:bold
 }
-#GridHeader {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  font-weight: bold;
+ .Cell{
+  background:#fff;
+  padding:4px;
+  overflow:hidden;
+  white-space:nowrap
 }
-.Cell {
-  background: #fff;
-  padding: 4px;
-  overflow: hidden;
-  white-space: nowrap;
+ .Cell[data-state="selected"]{
+  background:#8cf
 }
-.Cell[data-selected] {
-  background: #8cf;
+ .Cell[data-state="editing"]{
+  background:#ff8;
+  padding:0
 }
-.Cell[data-editing] {
-  background: #ff8;
-  padding: 0;
-}
-.Cell input {
-  width: 100%;
-  border: none;
-  font: inherit;
-  padding: 4px;
-}
-.Thumb {
-  width: 38px;
-  height: 38px;
-  object-fit: cover;
-  cursor: pointer;
+ .Cell input{
+  width:100%;
+  font:inherit;
+  border:1px solid #000;
+  padding:4px
 }
 /***** WIZARD OVERLAY *****/
 #wizardOverlay {
@@ -217,7 +206,7 @@ button:active {
       <div id="gallery"></div>
     </div>
     <div id="mode-table" class="mode">
-      <div style="--cols: 6">
+      <div>
         <div id="GridHeader"></div>
         <div id="GridBody"></div>
       </div>
@@ -926,211 +915,164 @@ function galleryImageElementCreate(uuid, thumbnailDataURL) {
   };
   return galleryImg;
 }
+/***** TABLE SPREADSHEET *****/
 const Table = (function() {
-  let sel = new Set();
-  let edit = null;
-  let longPress = null;
-  const LONG_MS = 500;
-  
-  function init() {
-    log('↘️Table.init');
-    render();
+  let selectedCellIds = new Set();
+  let editingCell = null;
+  let longPressTimer = null;
+  let longPressStartX = 0;
+  let longPressStartY = 0;
+  const LONG_PRESS_DURATION_MS = 500;
+  const TOUCH_MOVE_CANCEL_THRESHOLD_PX = 10;
+  const domHeaderEl = () => document.getElementById('GridHeader');
+  const domBodyEl = () => document.getElementById('GridBody');
+  function uuidFieldsFromInventory(uuid) {
+    const inventoryItem = inventory[uuid];
+    if (!inventoryItem) return null;
+    const valuesArray = valuesStringToArray(inventoryItem.values, schemaGet());
+    const fieldNameToValueMap = {};
+    schemaGet().forEach((schemaField, fieldIndex) => {
+      fieldNameToValueMap[schemaField.name] = (valuesArray[fieldIndex] || []).join(',');
+    });
+    return fieldNameToValueMap;
   }
-  
-  function render() {
+  function inventoryFieldUpdate(uuid, fieldName, newValue) {
+    const inventoryItem = inventory[uuid];
+    if (!inventoryItem) return;
+    const currentSchema = schemaGet();
+    const valuesArray = valuesStringToArray(inventoryItem.values, currentSchema);
+    const fieldIndex = currentSchema.findIndex(f => f.name === fieldName);
+    if (fieldIndex === -1) return;
+    if (currentSchema[fieldIndex].type === 'multiple') {
+      valuesArray[fieldIndex] = newValue ? newValue.split(',') : [];
+    } else {
+      valuesArray[fieldIndex] = newValue ? [newValue] : [];
+    }
+    const updatedValuesString = valuesArrayToString(valuesArray);
+    const updatedInventoryEntry = {[uuid]: {...inventoryItem, values: updatedValuesString}};
+    inventoryUpdate(updatedInventoryEntry).catch(err => log(`Update failed: ${err.message}`));
+  }
+  function renderTableFromInventory() {
     log('↘️Table.render');
-    const schema = schemaGet();
-    const header = document.getElementById('GridHeader');
-    const body = document.getElementById('GridBody');
-    
-    // Set column count
-    document.querySelector('#mode-table > div').style.setProperty('--cols', schema.length);
-    
-    // Header
-    header.innerHTML = '<div class="Cell">📷</div>';
-    schema.forEach(f => {
-      const c = document.createElement('div');
-      c.className = 'Cell';
-      c.textContent = f.name;
-      header.appendChild(c);
+    const currentSchema = schemaGet();
+    const columnCount = currentSchema.length;
+    domBodyEl().parentElement.style.setProperty('--cols', columnCount);
+    const headerCellsHtml = currentSchema.map(f => `<div class="Cell">${f.name}</div>`).join('');
+    domHeaderEl().innerHTML = '<div class="Cell">📷</div>' + headerCellsHtml;
+    const rowsHtml = Object.entries(inventory).map(([uuid, inventoryItem]) => {
+      const fieldValues = uuidFieldsFromInventory(uuid);
+      if (!fieldValues) return '';
+      const thumbnailHtml = inventoryItem.thumbnail 
+        ? `<img src="${inventoryItem.thumbnail}" style="width:38px;height:38px;object-fit:cover">`
+        : '📷';
+      const dataCellsHtml = currentSchema.map(schemaField => 
+        `<div class="Cell" data-uuid="${uuid}" data-field="${schemaField.name}">${fieldValues[schemaField.name] || ''}</div>`
+      ).join('');
+      return `<div class="Row"><div class="Cell" data-uuid="${uuid}" data-thumb="true">${thumbnailHtml}</div>${dataCellsHtml}</div>`;
+    }).join('');
+    domBodyEl().innerHTML = rowsHtml;
+    domBodyEl().addEventListener('click', handleCellClickEvent);
+    domBodyEl().addEventListener('touchstart', handleCellTouchStartEvent);
+    domBodyEl().addEventListener('touchmove', handleCellTouchMoveEvent);
+    domBodyEl().addEventListener('touchend', handleCellTouchEndEvent);
+  }
+  function handleCellClickEvent(clickEvent) {
+    const clickedCell = clickEvent.target.closest('[data-field]');
+    if (!clickedCell) return;
+    const clickedCellId = buildCellId(clickedCell);
+    if (editingCell) finishEditingAndSave();
+    if (!selectedCellIds.has(clickedCellId)) clearAllSelections();
+    beginEditingCell(clickedCell);
+  }
+  function handleCellTouchStartEvent(touchEvent) {
+    const touchedCell = touchEvent.target.closest('[data-field]');
+    if (!touchedCell || editingCell) return;
+    longPressStartX = touchEvent.touches[0].clientX;
+    longPressStartY = touchEvent.touches[0].clientY;
+    longPressTimer = setTimeout(() => {
+      toggleCellSelection(touchedCell);
+      longPressTimer = null;
+    }, LONG_PRESS_DURATION_MS);
+  }
+  function handleCellTouchMoveEvent(touchEvent) {
+    if (!longPressTimer) return;
+    const touchMoveDistanceX = Math.abs(touchEvent.touches[0].clientX - longPressStartX);
+    const touchMoveDistanceY = Math.abs(touchEvent.touches[0].clientY - longPressStartY);
+    if (touchMoveDistanceX > TOUCH_MOVE_CANCEL_THRESHOLD_PX || touchMoveDistanceY > TOUCH_MOVE_CANCEL_THRESHOLD_PX) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  }
+  function handleCellTouchEndEvent(touchEndEvent) {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  }
+  function buildCellId(cellElement) {
+    return `${cellElement.dataset.uuid}::${cellElement.dataset.field}`;
+  }
+  function toggleCellSelection(cellElement) {
+    const cellId = buildCellId(cellElement);
+    if (selectedCellIds.has(cellId)) {
+      selectedCellIds.delete(cellId);
+      delete cellElement.dataset.state;
+    } else {
+      selectedCellIds.add(cellId);
+      cellElement.dataset.state = 'selected';
+    }
+  }
+  function clearAllSelections() {
+    domBodyEl().querySelectorAll('[data-state="selected"]').forEach(selectedCell => {
+      delete selectedCell.dataset.state;
     });
-    
-    // Body
-    body.innerHTML = '';
-    Object.entries(inventory).forEach(([uuid, item]) => {
-      const row = document.createElement('div');
-      row.className = 'Row';
-      
-      // Thumb
-      const tc = document.createElement('div');
-      tc.className = 'Cell';
-      if (item.thumbnail) {
-        const img = document.createElement('img');
-        img.src = item.thumbnail;
-        img.className = 'Thumb';
-        tc.appendChild(img);
-      } else {
-        tc.textContent = '📷';
+    selectedCellIds.clear();
+  }
+  function beginEditingCell(cellElement) {
+    editingCell = cellElement;
+    cellElement.dataset.state = 'editing';
+    const cellUuid = cellElement.dataset.uuid;
+    const cellFieldName = cellElement.dataset.field;
+    const currentFieldValues = uuidFieldsFromInventory(cellUuid);
+    const currentCellValue = currentFieldValues?.[cellFieldName] || '';
+    const editInputElement = document.createElement('input');
+    editInputElement.value = currentCellValue;
+    cellElement.textContent = '';
+    cellElement.appendChild(editInputElement);
+    editInputElement.focus();
+    editInputElement.select();
+    editInputElement.onblur = () => finishEditingAndSave();
+    editInputElement.onkeydown = keyEvent => {
+      keyEvent.stopPropagation();
+      if (keyEvent.key === 'Enter') editInputElement.blur();
+      if (keyEvent.key === 'Escape') { 
+        editInputElement.value = currentCellValue; 
+        editInputElement.blur(); 
       }
-      row.appendChild(tc);
-      
-      // Fields
-      const vals = valuesStringToArray(item.values, schema);
-      schema.forEach((field, i) => {
-        const c = document.createElement('div');
-        c.className = 'Cell';
-        c.dataset.uuid = uuid;
-        c.dataset.field = field.name;
-        c.textContent = (vals[i] || []).join(',');
-        
-        // Touch handlers for mobile long-press
-        c.addEventListener('touchstart', onTouchStart);
-        c.addEventListener('touchmove', onTouchMove);
-        c.addEventListener('touchend', onTouchEnd);
-        
-        // Click handler for desktop/edit
-        c.addEventListener('click', onClick);
-        
-        row.appendChild(c);
-      });
-      
-      body.appendChild(row);
-    });
-  }
-  
-  function onClick(e) {
-    const c = e.target;
-    if (!c.dataset.uuid) return;
-    
-    const id = `${c.dataset.uuid}::${c.dataset.field}`;
-    
-    // If editing another cell, save it first
-    if (edit && edit !== c) save();
-    
-    // If not already selected, clear selection and start edit
-    if (!sel.has(id)) {
-      clearSel();
-      startEdit(c);
-    } else {
-      // Already selected, start edit
-      startEdit(c);
-    }
-  }
-  
-  function onTouchStart(e) {
-    const c = e.target;
-    if (!c.dataset.uuid) return;
-    if (edit) return; // Don't select while editing
-    
-    longPress = setTimeout(() => {
-      toggleSel(c);
-      longPress = null;
-    }, LONG_MS);
-  }
-  
-  function onTouchMove(e) {
-    if (longPress) {
-      clearTimeout(longPress);
-      longPress = null;
-    }
-  }
-  
-  function onTouchEnd(e) {
-    if (longPress) {
-      clearTimeout(longPress);
-      longPress = null;
-    }
-  }
-  
-  function toggleSel(c) {
-    const id = `${c.dataset.uuid}::${c.dataset.field}`;
-    if (sel.has(id)) {
-      sel.delete(id);
-      delete c.dataset.selected;
-    } else {
-      sel.add(id);
-      c.dataset.selected = '';
-    }
-  }
-  
-  function clearSel() {
-    document.querySelectorAll('.Cell[data-selected]').forEach(c => {
-      delete c.dataset.selected;
-    });
-    sel.clear();
-  }
-  
-  function startEdit(c) {
-    if (edit) save();
-    
-    edit = c;
-    c.dataset.editing = '';
-    const val = c.textContent;
-    c.textContent = '';
-    
-    const inp = document.createElement('input');
-    inp.value = val;
-    c.appendChild(inp);
-    inp.focus();
-    inp.select();
-    
-    inp.onblur = () => save();
-    inp.onkeydown = e => {
-      e.stopPropagation();
-      if (e.key === 'Enter') save();
-      if (e.key === 'Escape') { inp.value = val; save(); }
     };
   }
-  
-  function save() {
-    if (!edit) return;
-    
-    const inp = edit.querySelector('input');
-    const newVal = inp.value;
-    const uuid = edit.dataset.uuid;
-    const field = edit.dataset.field;
-    
-    // Batch edit if selection exists
-    if (sel.size > 0) {
-      sel.forEach(id => {
-        const [u, f] = id.split('::');
-        updateField(u, f, newVal);
-        const c = document.querySelector(`.Cell[data-uuid="${u}"][data-field="${f}"]`);
-        if (c) {
-          c.textContent = newVal;
-          delete c.dataset.selected;
-        }
-      });
-      clearSel();
-    } else {
-      // Single edit
-      updateField(uuid, field, newVal);
-      edit.textContent = newVal;
-    }
-    
-    delete edit.dataset.editing;
-    edit = null;
+  function finishEditingAndSave() {
+    if (!editingCell) return;
+    const editInputElement = editingCell.querySelector('input');
+    const userEnteredValue = editInputElement.value;
+    const editedCellUuid = editingCell.dataset.uuid;
+    const editedCellFieldName = editingCell.dataset.field;
+    const editedCellId = buildCellId(editingCell);
+    const cellIdsToUpdate = selectedCellIds.size > 0 ? [...selectedCellIds] : [editedCellId];
+    cellIdsToUpdate.forEach(cellIdToUpdate => {
+      const [uuidToUpdate, fieldNameToUpdate] = cellIdToUpdate.split('::');
+      inventoryFieldUpdate(uuidToUpdate, fieldNameToUpdate, userEnteredValue);
+      const cellElementToUpdate = domBodyEl().querySelector(`[data-uuid="${uuidToUpdate}"][data-field="${fieldNameToUpdate}"]`);
+      if (cellElementToUpdate) {
+        cellElementToUpdate.textContent = userEnteredValue;
+        delete cellElementToUpdate.dataset.state;
+      }
+    });
+    clearAllSelections();
+    delete editingCell.dataset.state;
+    editingCell = null;
   }
-  
-  function updateField(uuid, field, val) {
-    log(`↘️Table.updateField: ${uuid}.${field} = ${val}`);
-    const item = inventory[uuid];
-    const schema = schemaGet();
-    const vals = valuesStringToArray(item.values, schema);
-    const idx = schema.findIndex(f => f.name === field);
-    
-    if (schema[idx].type === 'multiple') {
-      vals[idx] = val ? val.split(',') : [];
-    } else {
-      vals[idx] = val ? [val] : [];
-    }
-    
-    const newVals = valuesArrayToString(vals);
-    const newEntry = {[uuid]: {...item, values: newVals}};
-    inventoryUpdate(newEntry).catch(e => log(`❌ ${e.message}`));
-  }
-  
-  return {init};
+  return { init: renderTableFromInventory };
 })();
 // DISCUSSION: How to make components more robust?
 // RESILIENT INPUT + NON-BLOCKING: Wizard failures return empty metadata rather than throwing. Input validation warns but doesn't prevent progression. Build functions handle missing schema gracefully.
