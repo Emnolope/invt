@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v18.20</title>
+  <title>InvtSysShell3+ v18.20+</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -37,20 +37,20 @@ button:active {
   background: rgba(0, 0, 0, 0.9);
 }
 /***** FIXED CONTROLS *****/
-.fixed-controls {
+.controls-fixed {
   position: fixed;
   display: flex;
   gap: 10px;
   z-index: 100;
 }
-.mode-controls {
+.controls-mode {
   top: 20px;
   left: 20px;
   right: 20px;
   z-index: 1000;
   justify-content: space-between;
 }
-.camera-controls {
+.controls-camera {
   bottom: 20px;
   left: 20px;
   right: 20px;
@@ -70,56 +70,56 @@ button:active {
   padding-top: 80px;
 }
 /***** CAMERA *****/
-#camera {
+#c-video {
   width: 100vw;
   height: 100vh;
   object-fit: cover;
   cursor: pointer;
 }
 /***** GALLERY *****/
-#gallery {
+#g-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
-.gallery-item {
+.g-grid-item {
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
   cursor: pointer;
 }
 /***** TABLE GRID *****/
-#GridHeader,.Row{
+#t-header, .table-row{
   display:grid;
   grid-template-columns:40px repeat(var(--cols),1fr);
   gap:1px
 }
- #GridHeader{
+#t-header{
   position:sticky;
   top:0;
   background:#ccc;
   font-weight:bold
 }
- .Cell{
+.table-cell{
   background:#fff;
   padding:4px;
   overflow:hidden;
   white-space:nowrap
 }
- .Cell[data-state="selected"]{
+.table-cell[data-state="selected"]{
   background:#8cf
 }
- .Cell[data-state="editing"]{
+.table-cell[data-state="editing"]{
   background:#ff8;
   padding:0
 }
- .Cell input{
+.table-cell input{
   width:100%;
   font:inherit;
   border:1px solid #000;
   padding:4px
 }
 /***** WIZARD OVERLAY *****/
-#wizardOverlay {
+#w-overlay {
   position: fixed;
   inset: 0;
   display: none;
@@ -129,7 +129,7 @@ button:active {
   gap: 2px;
   z-index: 2000;
 }
-.wizardPane {
+.wizard-pane {
   flex: 1;
   display: grid;
   gap: 2px;
@@ -142,20 +142,20 @@ button:active {
 .wizard-screen.active {
   display: grid;
 }
-#wizardNavi {
+#w-navi {
   height: 80px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 2px;
 }
-#wizardNavi button {
+#w-navi button {
   font-size: 1.5em;
   background: #333;
 }
-#wizardNavi button:hover {
+#w-navi button:hover {
   background: #555;
 }
-#wizardNavi button:active {
+#w-navi button:active {
   background: #777;
 }
 /***** WIZARD INPUTS *****/
@@ -176,7 +176,7 @@ button:active {
 .wizard-input:checked + .wizard-label:hover {
   background: #0056b3;
 }
-.wizard-text {
+.wizard-input-text {
   width: 100%;
   height: 100%;
   font-size: 2em;
@@ -190,46 +190,46 @@ button:active {
   </style>
 </head>
 <body>
-  <div id="gate" style="position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:9999">
+  <div id="init-gate" style="position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:9999">
     <button onclick="init()" style="font-size:4em;padding:40px">📁 PICK FOLDER</button>
   </div>
   <div id="app">
     <div id="mode-camera" class="mode">
-      <video id="camera" autoplay playsinline onclick="uiCapture('rapid')"></video>
-      <div class="fixed-controls camera-controls">
+      <video id="c-video" autoplay playsinline onclick="uiCapture('rapid')"></video>
+      <div class="controls-fixed controls-camera">
         <button onclick="cameraTorchButton()">🔦</button>
         <button onclick="uiWizardToggler()">🐌</button>
         <button onclick="cameraFlipButton()">🔄</button>
       </div>
     </div>
     <div id="mode-gallery" class="mode">
-      <div id="gallery"></div>
+      <div id="g-grid"></div>
     </div>
     <div id="mode-table" class="mode">
       <div>
-        <div id="GridHeader"></div>
-        <div id="GridBody"></div>
+        <div id="t-header"></div>
+        <div id="t-body"></div>
       </div>
     </div>
     <div id="mode-settings" class="mode">
       <button onclick="directoryPickButton()">directoryPick</button>
       <button onclick="inventoryLoadButton()">uiLoad</button>
       <div>
-        <textarea id="schemaTextarea" placeholder="Schema JSON"></textarea>
+        <textarea id="schema-input" placeholder="Schema JSON"></textarea>
         <button onclick="schemaLoadButton()">schemaLoad</button>
         <button onclick="schemaLearnButton()">schemaLearn</button>
         <button onclick="schemaSaveButton()">schemaSave</button>
       </div>
-      <textarea id="output" readonly style="width: 100%; font-family: monospace; font-size: 12px; overflow-y: auto;"></textarea>
+      <textarea id="debug-output" readonly style="width: 100%; font-family: monospace; font-size: 12px; overflow-y: auto;"></textarea>
     </div>
   </div>
-  <div class="fixed-controls mode-controls">
+  <div class="controls-fixed controls-mode">
     <button onclick="uiBack()">⬅️</button>
     <button onclick="uiNext()">➡️</button>
   </div>
-  <div id="wizardOverlay">
-    <div id="wizardPanels" class="wizardPane"></div>
-    <div id="wizardNavi"></div>
+  <div id="w-overlay">
+    <div id="w-panels" class="wizard-pane"></div>
+    <div id="w-navi"></div>
   </div>
 <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
 <script>eruda.init();</script>
@@ -239,14 +239,14 @@ function log(...msgs) {
   const message = msgs.map(msg => 
     typeof msg === 'object' ? JSON.stringify(msg, null, 2) : String(msg)
   ).join(' ');
-  const outputBox = document.getElementById('output');
+  const outputBox = document.getElementById('debug-output');
   outputBox.value += `[${new Date().toISOString()}] ${message}\n`;
   outputBox.scrollTop = outputBox.scrollHeight;
 }
 async function init() {
   try {
     await directoryPickButton();
-    document.getElementById('gate').style.display = 'none';
+    document.getElementById('init-gate').style.display = 'none';
     await schemaLoadButton();
     await schemaLearnButton();
     await inventoryLoadButton();
@@ -507,7 +507,7 @@ const Camera = {
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } }
       });
-      this.video = document.getElementById('camera');
+      this.video = document.getElementById('c-video');
       this.video.srcObject = this.stream;
       this.track = this.stream.getVideoTracks()[0];
       await new Promise((resolve, reject) => {
@@ -602,7 +602,7 @@ function uiRender() {
 function uiWizardToggler() {
   log(`↘️uiWizardToggler`);
   uiWizardToggle = !uiWizardToggle;
-  const buttons = document.querySelectorAll('.camera-controls button');
+  const buttons = document.querySelectorAll('.controls-camera button');
   buttons.forEach(btn => {
     if (btn.onclick?.toString().includes('uiWizardToggler')) {
       btn.textContent = uiWizardToggle ? '⚡' : '🐌';
@@ -611,7 +611,7 @@ function uiWizardToggler() {
 }
 /***** DYNAMIC SCHEMA SYSTEM *****/
 // RESILIENT PARSING + DEFAULTS: schemaLoad should return default schema structure if all files fail, not empty string. schemaAnalyze should continue processing remaining files when individual inventoryFromFile calls fail, logging specific problematic filenames. SchemaLearn should never throw - always produce usable schema.
-let schemaText = document.getElementById('schemaTextarea');
+let schemaText = document.getElementById('schema-input');
 schemaText.value = '[]';
 schemaText.addEventListener('input', () => { schemaDirty = true; });
 let schemaDirty = false;
@@ -803,7 +803,7 @@ const CACHENAME = 'cache.json';
 async function galleryLoad() {
   log(`↘️galleryLoad`);
   try {
-    const gallery = document.getElementById('gallery');
+    const gallery = document.getElementById('g-grid');
     gallery.innerHTML = '';
     await cacheLoad();
     for (const uuid in inventory) {
@@ -924,8 +924,8 @@ const Table = (function() {
   let longPressStartY = 0;
   const LONG_PRESS_DURATION_MS = 500;
   const TOUCH_MOVE_CANCEL_THRESHOLD_PX = 10;
-  const domHeaderEl = () => document.getElementById('GridHeader');
-  const domBodyEl = () => document.getElementById('GridBody');
+  const domHeaderEl = () => document.getElementById('t-header');
+  const domBodyEl = () => document.getElementById('t-body');
   function uuidFieldsFromInventory(uuid) {
     const inventoryItem = inventory[uuid];
     if (!inventoryItem) return null;
@@ -1123,10 +1123,10 @@ const Wizard = (function() {
   }
   function init() {
     log(`↘️Wizard.init`);
-    wizardOverlay = document.getElementById('wizardOverlay');
-    wizardPanels = document.getElementById('wizardPanels');
+    wizardOverlay = document.getElementById('w-overlay');
+    wizardPanels = document.getElementById('w-panels');
     wizardPanels.innerHTML = '';
-    navi = document.getElementById('wizardNavi');
+    navi = document.getElementById('w-navi');
     navi.innerHTML = '';
     [
       {textContent: '⬅️', onclick: back},
@@ -1155,7 +1155,7 @@ const Wizard = (function() {
     if (field.type === 'text') {
       screen.style.cssText = 'grid-template-columns:1fr;grid-template-rows:1fr';
       const textarea = document.createElement('textarea');
-      textarea.className = 'wizard-text';
+      textarea.className = 'wizard-input-text';
       textarea.placeholder = `Enter ${field.name}`;
       textarea.value = values[index] ? values[index].join(',') : '';
       textarea.oninput = () => {
