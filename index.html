@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>InvtSysShell3+ v18.18</title>
+  <title>InvtSysShell3+ v18.11+</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
 /***** RESET *****/
@@ -90,12 +90,9 @@ button:active {
 /***** TABLE GRID *****/
 #GridHeader, .Row {
   display: grid;
-  grid-template-columns: 40px 140px 140px 140px 166px; 
-  width: 626px;
-  border-bottom: 1px solid #000;
-  min-height: 16px;
-  align-items: center;
-  font-size: 14px;
+  grid-template-columns: 40px repeat(auto-fit, minmax(140px, 1fr));
+  width: fit-content;
+  min-width: 626px;
 }
 #GridHeader {
   font-weight: bold;
@@ -952,38 +949,50 @@ function galleryImageElementCreate(uuid, thumbnailDataURL) {
 }
 /***** TABLE SPREADSHEET *****/
 const Table = (function() {
-  const fieldNames = ['LocationPath', 'Category', 'Flag', 'Note'];
   const dataKeys = {uuid:'data-uuid', id:'data-cell-id'};
-  
   let selectedCells = new Set();
   let editingCellId = null;
   let pressTimer = null;
   let startX = 0, startY = 0;
   const longPressTime = 500, moveTolerance = 10;
+
   function clearSelection() {
     log('↘️Table.clearSelection');
     document.querySelectorAll('.Selected').forEach(c => c.classList.remove('Selected'));
     selectedCells.clear();
   }
+  
   function toggleSelection(element, id) {
     log(`↘️Table.toggleSelection: ${id}`);
     selectedCells.has(id) ? selectedCells.delete(id) : selectedCells.add(id);
     element.classList.toggle('Selected');
   }
+  
   function logSelected() {
     log('↘️Table.logSelected:', [...selectedCells]);
   }
+  
   function createHeader() {
     log('↘️Table.createHeader');
-    const header = document.getElementById('GridHeader');;
+    const header = document.getElementById('GridHeader');
     header.innerHTML = '';
-    ['ACT', ...fieldNames].forEach(text => {
+    const schema = schemaGet();
+    
+    // ACT column
+    const actCell = document.createElement('div');
+    actCell.className = 'headerCell cell';
+    actCell.textContent = 'ACT';
+    header.appendChild(actCell);
+    
+    // Schema-driven columns
+    schema.forEach(field => {
       const c = document.createElement('div');
-      c.className = 'HeaderCell Cell';
-      c.textContent = text;
+      c.className = 'headerCell cell';
+      c.textContent = field.name;
       header.appendChild(c);
     });
   }
+  
   function parseInventoryToFields(uuid) {
     log(`↘️Table.parseInventoryToFields: ${uuid}`);
     const item = inventory[uuid];
@@ -999,11 +1008,14 @@ const Table = (function() {
       const fieldValue = valuesArray[index] || [];
       fields[field.name] = fieldValue.join(',');
     });
+    
     return fields;
   }
+  
   function saveEdit(uuid, fieldName, input, masterCell) {
     log(`↘️Table.saveEdit: ${uuid}::${fieldName}`);
     const newValue = input.value;
+    
     if (selectedCells.size > 0) {
       // Batch edit
       selectedCells.forEach(cellId => {
@@ -1020,12 +1032,14 @@ const Table = (function() {
       // Single edit
       updateInventoryField(uuid, fieldName, newValue);
     }
+    
     masterCell.innerHTML = '';
     masterCell.textContent = newValue;
     masterCell.classList.remove('Editing');
     clearSelection();
     editingCellId = null;
   }
+  
   function updateInventoryField(uuid, fieldName, newValue) {
     log(`↘️Table.updateInventoryField: ${uuid}.${fieldName} = ${newValue}`);
     
@@ -1119,7 +1133,7 @@ const Table = (function() {
   
   function renderInventory() {
     log('↘️Table.renderInventory');
-    const body = document.getElementById('GridBody');;
+    const body = document.getElementById('GridBody');
     body.innerHTML = '';
     
     Object.entries(inventory).forEach(([uuid, item]) => {
@@ -1132,35 +1146,50 @@ const Table = (function() {
       thumbCell.className = 'Cell ThumbCell';
       thumbCell.setAttribute(dataKeys.id, `${uuid}::t`);
       
-      const thumbDiv = document.createElement('div');
-      thumbDiv.className = 'Thumb';
-      thumbDiv.textContent = '📷';
-      
-      thumbCell.onclick = e => {
-        e.stopPropagation();
-        if (!editingCellId) {
-          log(`Navigate to gallery: ${uuid}`);
-          // TODO: Navigate to gallery and focus on this item
-        }
-      };
+      // Check if thumbnail exists in inventory
+      if (inventory[uuid].thumbnail) {
+        const thumbImg = document.createElement('img');
+        thumbImg.src = inventory[uuid].thumbnail;
+        thumbImg.style.cssText = 'width:38px;height:38px;object-fit:cover;cursor:pointer';
+        thumbImg.onclick = e => {
+          e.stopPropagation();
+          if (!editingCellId) {
+            log(`Navigate to gallery: ${uuid}`);
+            // TODO: Navigate to gallery and focus on this item
+          }
+        };
+        thumbCell.appendChild(thumbImg);
+      } else {
+        const thumbDiv = document.createElement('div');
+        thumbDiv.className = 'Thumb';
+        thumbDiv.textContent = '📷';
+        thumbDiv.onclick = e => {
+          e.stopPropagation();
+          if (!editingCellId) {
+            log(`Navigate to gallery: ${uuid}`);
+          }
+        };
+        thumbCell.appendChild(thumbDiv);
+      }
       
       thumbCell.appendChild(thumbDiv);
       row.appendChild(thumbCell);
       
-      // Data cells
+      // Data cells - schema-driven
       const fields = parseInventoryToFields(uuid);
       if (!fields) return;
       
-      fieldNames.forEach(fieldName => {
+      const schema = schemaGet();
+      schema.forEach(schemaField => {
         const cell = document.createElement('div');
-        const cellId = `${uuid}::${fieldName}`;
-        cell.className = 'Cell DataCell';
+        const cellId = `${uuid}::${schemaField.name}`;
+        cell.className = 'cell dataCell';
         cell.setAttribute(dataKeys.id, cellId);
-        cell.textContent = fields[fieldName] || '';
+        cell.textContent = fields[schemaField.name] || '';
         
         if (selectedCells.has(cellId)) cell.classList.add('Selected');
         
-        cell.onclick = e => handleTap(e, uuid, fieldName, cellId);
+        cell.onclick = e => handleTap(e, uuid, schemaField.name, cellId);
         cell.addEventListener('touchstart', handlePressStart);
         cell.addEventListener('touchmove', handlePressMove);
         cell.addEventListener('touchend', handlePressEnd);
@@ -1171,11 +1200,13 @@ const Table = (function() {
       body.appendChild(row);
     });
   }
+  
   function init() {
     log('↘️Table.init');
     createHeader();
     renderInventory();
   }
+  
   return {
     init,
     clearSelection,
