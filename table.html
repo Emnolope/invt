@@ -1,192 +1,557 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Elegant Mobile Grid</title>
+  <title>Table Timeline 18.16</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
-    /* Web 2.0 Space-Maximized CSS */
-    body {
-      margin: 0;
-      font: 14px 'Courier New', monospace;
-      overflow-x: auto; /* ENABLED horizontal scroll on the entire body */
-    }
-    #App {
-      max-width: none; /* Removed constraint to allow width expansion */
-      width: fit-content; /* Width matches the inner grid content */
-      margin: 0 auto;
-    }
-    #GridHeader, .Row {
-      display: grid;
-      /* Fixed column widths to enable scrolling: 40px (Thumb) + 4 Data columns */
-      grid-template-columns: 40px 140px 140px 140px 166px; 
-      width: 626px; /* Total fixed width for inner content */
-      border-bottom: 1px solid #000;
-      min-height: 16px; /* Reduced to minimum */
-      align-items: center;
-    }
-    #GridHeader {
-      font-weight: bold;
-      background: #ccc;
-    }
-    .Cell {
-      /* Removed all padding */
-      overflow: hidden;
-      white-space: nowrap;
-      user-select: none;
-      touch-action: manipulation;
-    }
-    .ThumbCell {
-      text-align: center;
-    }
-    .Thumb {
-      /* Collapsed height to fit text, removed margin/padding */
-      width: 100%; 
-      height: 14px; 
-      background: #666;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-    }
-    /* Stark, clear state indicators */
-    .Selected {
-      background: #8cf;
-    } 
-    .Editing {
-      background: #ff8;
-    }
-    input {
-      width: 98%;
-      box-sizing: border-box;
-      font: inherit;
-      padding: 0; /* Removed padding */
-      border: 1px solid #000;
-    }
+/***** RESET *****/
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/***** LAYOUT *****/
+body {
+  height: 100vh;
+  font-family: system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+/***** UNIVERSAL BUTTON *****/
+button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2em;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  /* MOBILE: Touch-friendly minimum 44px tap targets */
+  min-width: 44px;
+  min-height: 44px;
+}
+button:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+button:active {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+/***** FIXED CONTROLS *****/
+.fixed-controls {
+  position: fixed;
+  display: flex;
+  gap: 10px;
+  z-index: 1000;
+}
+.mode-controls {
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  justify-content: space-between;
+  /* CONSTRAINT: Content must have top padding >= button height + gap */
+  /* Buttons are ~64px tall (44px + padding), so use 80px padding */
+}
+
+/***** MODE SYSTEM *****/
+.mode {
+  display: none;
+}
+.mode.active {
+  display: block;
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;  /* CRITICAL: Content scrolls, buttons don't */
+  overflow-x: hidden;
+}
+
+/***** PLACEHOLDER CONTENT FOR OTHER MODES *****/
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3em;
+  color: #666;
+}
+
+/***** DEBUG OUTPUT *****/
+#output {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 150px;
+  background: #000;
+  color: #0f0;
+  font-family: monospace;
+  font-size: 10px;
+  padding: 5px;
+  overflow-y: auto;
+  z-index: 999;
+  border-top: 2px solid #0f0;
+}
+
+/***** GEMINI TABLE STYLES (Space-Maximized) *****/
+#TableContainer {
+  /* Allow horizontal scroll within the table content area */
+  overflow-x: auto;
+  font: 14px 'Courier New', monospace;
+  width: fit-content;
+  margin: 0;
+}
+#GridHeader, .Row {
+  display: grid;
+  /* Fixed column widths to enable scrolling: 40px (Thumb) + 6 Data columns */
+  grid-template-columns: 40px 100px 100px 100px 100px 100px 100px; 
+  width: 640px; /* Total fixed width for inner content (40 + 6*100) */
+  border-bottom: 1px solid #000;
+  min-height: 16px; /* Space-Maximized height */
+  align-items: center;
+}
+#GridHeader {
+  font-weight: bold;
+  background: #ccc;
+}
+.Cell {
+  overflow: hidden;
+  white-space: nowrap;
+  user-select: none;
+  touch-action: manipulation;
+}
+.ThumbCell {
+  text-align: center;
+}
+.Thumb {
+  /* Collapsed height to fit text, removed margin/padding */
+  width: 100%; 
+  height: 14px; 
+  background: #666;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+.Selected {
+  background: #8cf;
+} 
+.Editing {
+  background: #ff8;
+}
+input {
+  width: 98%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0; /* Removed padding */
+  border: 1px solid #000;
+}
   </style>
 </head>
 <body>
-  <div id="App">
-    <div id="GridHeader"></div>
-    <div id="GridBody"></div>
-    <div style="padding:4px;text-align:center">
-      <button onclick="logSelected()">LOG SELECTED CELL IDs</button>
-      <button onclick="clearSelection()">CLEAR SELECTION</button>
+  <div id="mode-camera" class="mode placeholder">
+    📸 Camera Mode
+  </div>
+  
+  <div id="mode-gallery" class="mode placeholder">
+    🖼️ Gallery Mode<br>
+    <small>(Will show focused item when navigated from table)</small>
+  </div>
+  
+  <div id="mode-table" class="mode active">
+    
+    <div style="padding: 80px 20px 20px 20px;">
+      <h1>Table View - Gemini Spreadsheet Integration Point</h1>
+      
+      <h2>Data Structures Available:</h2>
+      <pre style="background: #f0f0f0; padding: 10px; overflow-x: auto;">
+inventory = {
+  "UUID_TIMESTAMP": {
+    ext: "jpg",           // File extension
+    values: "string",     // Underscore-delimited metadata
+    thumbnail: "dataURL"  // Base64 image or null
+  }
+}
+
+schema = [
+  {
+    name: "FieldName",
+    type: "text|single|multiple",
+    options: ["a", "b"]    // Only for single/multiple types
+  }
+]
+      </pre>
+      
+      <h2>Required Functions:</h2>
+      <ul style="line-height: 1.8;">
+        <li><code>valuesStringToArray(string, schema)</code> - Parse metadata string to nested arrays</li>
+        <li><code>valuesArrayToString(array)</code> - Convert nested arrays back to string</li>
+        <li><code>inventoryUpdate(entry)</code> - Save changes (triggers file rename in real system)</li>
+        <li><code>galleryThumbnailGet(uuid)</code> - Async thumbnail fetch/regenerate</li>
+        <li><code>navigateToGalleryItem(uuid)</code> - Switch to gallery mode, focus on item</li>
+        <li><code>log(...msgs)</code> - Debug logging to textarea at bottom</li>
+      </ul>
+      
+      <h2>Your Spreadsheet Goes Below:</h2>
+      <div id="gemini-table">
+        <div id="TableContainer">
+          <div id="GridHeader"></div>
+          <div id="GridBody"></div>
+        </div>
+        <div style="padding:4px;text-align:center">
+          <button onclick="logSelected()">LOG SELECTED CELL IDs</button>
+          <button onclick="clearSelection()">CLEAR SELECTION</button>
+        </div>
+      </div>
     </div>
   </div>
+  
+  <div id="mode-settings" class="mode placeholder">
+    ⚙️ Settings Mode
+  </div>
+
+  <div class="fixed-controls mode-controls">
+    <button onclick="uiBack()">⬅️</button>
+    <button onclick="uiNext()">➡️</button>
+  </div>
+
+  <textarea id="output" readonly></textarea>
+
   <script>
-    // --- DATA & STATE ---
-    const fieldNames = ['LocationPath', 'Category', 'Flag', 'Note']
-    const dataKeys = {uuid:'data-uuid', id:'data-cell-id'}
-    const inventory = {"20250604135552143":{thumbnail:"T1",LocationPath:"Bando.BoxA",Category:"c,t,b",Flag:"GET",Note:"Fire gloves"},"20250604135552144":{thumbnail:"T2",LocationPath:"Bando.BoxB",Category:"h,m",Flag:"INV",Note:"Power tool kit"},"20250604135552145":{thumbnail:"T3",LocationPath:"Shelf.L1",Category:"c",Flag:"PUT",Note:"Spare cables"},"20250604135552146":{thumbnail:"T4",LocationPath:"Rack.Bay2",Category:"t,b",Flag:"GET",Note:"Safety goggles"},"20250604135552147":{thumbnail:"T5",LocationPath:"Desk.Draw3",Category:"m",Flag:"INV",Note:"ID badge laminates"}}
+/***** LOGGING SYSTEM (matches v18.11+) *****/
+function log(...msgs) {
+  const message = msgs.map(msg => 
+    typeof msg === 'object' ? JSON.stringify(msg, null, 2) : String(msg)
+  ).join(' ');
+  const outputBox = document.getElementById('output');
+  outputBox.value += `[${new Date().toISOString()}] ${message}\n`;
+  outputBox.scrollTop = outputBox.scrollHeight;
+}
+
+/***** MOCK DATA STRUCTURES *****/
+let inventory = {
+  "20250604135552143": {
+    ext: "jpg",
+    values: "Bando.BoxA_c,t,b_GET__Fire gloves for workshop",
+    thumbnail: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23f00' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='white' font-size='40' font-family='monospace'%3E1%3C/text%3E%3C/svg%3E"
+  },
+  "20250604140151492": {
+    ext: "jpg", 
+    values: "Bando.BoxA.PencilCase._i____Marker for labeling",
+    thumbnail: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%2300f' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='white' font-size='40' font-family='monospace'%3E2%3C/text%3E%3C/svg%3E"
+  },
+  "20250604142028052": {
+    ext: "jpg",
+    values: "Bando.BoxA.PencilCase._t__TOSS_",
+    thumbnail: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%230f0' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='white' font-size='40' font-family='monospace'%3E3%3C/text%3E%3C/svg%3E"
+  },
+  "20250606153232592": {
+    ext: "jpeg",
+    values: "Bando.BoxA._c,v_STAY__Cracked helmet",
+    thumbnail: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23f0f' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='white' font-size='40' font-family='monospace'%3E4%3C/text%3C/svg%3E"
+  },
+  "20250606153232593": {
+    ext: "png",
+    values: "Kitchen.Drawer__w,f__KEEP_SELECT_Spatulas and forks",
+    thumbnail: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23fa0' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='white' font-size='40' font-family='monospace'%3E5%3C/text%3E%3C/svg%3E"
+  },
+  "20250606153232594": {
+    ext: "jpg",
+    values: "______",  // EDGE CASE: All empty fields
+    thumbnail: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23888' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='white' font-size='40' font-family='monospace'%3E6%3C/text%3E%3C/svg%3E"
+  }
+};
+
+let schema = [
+  {
+    name: "LocationPath",
+    type: "text"
+  },
+  {
+    name: "Category", 
+    type: "multiple",
+    options: ["c", "t", "b", "w", "f", "i", "e", "h", "v", "s"]
+  },
+  {
+    name: "RetrievalFlag",
+    type: "single", 
+    options: ["GET", "STAY"]
+  },
+  {
+    name: "DisposalFlag",
+    type: "single",
+    options: ["TOSS", "KEEP"]
+  },
+  {
+    name: "SelectionFlag",
+    type: "single",
+    options: ["SELECT", "UNSELECT"]
+  },
+  {
+    name: "Note",
+    type: "text"
+  }
+];
+
+/***** REQUIRED FUNCTIONS *****/
+function valuesStringToArray(valuesString, schema = null) {
+  log(`↘️ valuesStringToArray: ${valuesString}`);
+  if (!valuesString) return [];
+  const parts = valuesString.split('_');
+  const result = parts.map((part, index) => {
+    if (schema?.[index]?.type === 'multiple') {
+      return part ? part.split(',') : [];
+    } else {
+      return part ? [part] : [];
+    }
+  });
+  return result;
+}
+
+function valuesArrayToString(valuesArray) {
+  log(`↘️ valuesArrayToString: ${JSON.stringify(valuesArray)}`);
+  return valuesArray.map(fieldArray => fieldArray.join(',')).join('_');
+}
+
+async function inventoryUpdate(newEntry) {
+  log(`↘️ inventoryUpdate: ${JSON.stringify(newEntry)}`);
+  try {
+    const [[uuid, newItem]] = Object.entries(newEntry);
+    // MOCK: In real system this triggers fileUpdate()
+    inventory = {...inventory, ...newEntry};
+    // Re-render the grid to reflect the change from the updated inventory object
+    renderInventory(); 
+    log(`✓ Inventory updated (mock - no file I/O)`);
+  } catch (e) {
+    log(`❌ inventoryUpdate failed: ${e.message}`);
+    throw e;
+  }
+}
+
+async function galleryThumbnailGet(uuid) {
+  log(`↘️ galleryThumbnailGet: ${uuid}`);
+  try {
+    // MOCK: Return cached thumbnail or regenerate from file
+    const thumbnail = inventory[uuid]?.thumbnail;
+    if (thumbnail) return thumbnail;
     
-    let selectedCells = new Set()
-    let editingCellId = null
-    let pressTimer = null
-    let startX = 0, startY = 0
-    const longPressTime = 500, moveTolerance = 10
-    const D = document, H = D.getElementById('GridHeader'), B = D.getElementById('GridBody')
+    // In real system: read file, create canvas, generate thumbnail
+    log(`⚠️ Thumbnail missing for ${uuid}, would regenerate`);
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23ccc' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='%23666' font-size='20'%3E?%3C/text%3E%3C/svg%3E";
+  } catch (e) {
+    log(`❌ galleryThumbnailGet failed: ${e.message}`);
+    return null;
+  }
+}
 
-    // --- LOGGING ---
-    const logNav = u=>console.log(`Maps:${u}`), logEdit = (i,v)=>console.log(`EDIT:${i}=${v}`)
-    const logSelect = ()=>console.log(`SELECT:${selectedCells.size} [${[...selectedCells].join(',')}]`)
-    const logSelected = ()=>console.log('Selected:',[...selectedCells])
+function navigateToGalleryItem(uuid) {
+  log(`↘️ navigateToGalleryItem: ${uuid}`);
+  // In real system: set focus state, switch mode, scroll to item
+  uiIndex = 1;
+  uiRender();
+  log(`🎯 Gallery would focus on UUID: ${uuid}`);
+}
 
-    // --- SELECTION UTILITIES ---
-    const clearSelection = ()=>{
-      D.querySelectorAll('.Selected').forEach(c=>c.classList.remove('Selected'))
-      selectedCells.clear(); logSelect()
-    }
-    const toggleSelection = (element, id)=>{
-      selectedCells.has(id)?selectedCells.delete(id):selectedCells.add(id)
-      element.classList.toggle('Selected'); logSelect()
-    }
+/***** UI MODE SYSTEM *****/
+const uiModes = {
+  'mode-camera': '📸',
+  'mode-gallery': '🖼️',
+  'mode-table': '📊',
+  'mode-settings': '⚙️'
+};
+const uiArray = Object.keys(uiModes);
+let uiIndex = 2; // Start on table mode for testing
 
-    // --- RENDERING ---
-    const createHeader = ()=>{
-      H.innerHTML='';
-      ['ACT',...fieldNames].map(text=>{const c=D.createElement('div');c.className='HeaderCell';c.textContent=text;H.append(c)})
-    }
-    const renderInventory = ()=>{
-      B.innerHTML='';
-      Object.entries(inventory).map(([u,item])=>{
-        const r=D.createElement('div');r.className='Row';r.setAttribute(dataKeys.uuid,u)
+function uiNext() {
+  log(`↘️ uiNext`);
+  uiIndex = (uiIndex + 1) % uiArray.length;
+  uiRender();
+}
 
-        // Leftmost Cell (Navigation)
-        const tc=D.createElement('div');tc.className='Cell ThumbCell';tc.setAttribute(dataKeys.id,`${u}::t`)
-        const td=D.createElement('div');td.className='Thumb';td.textContent=item.thumbnail
-        tc.onclick=e=>{e.stopPropagation();editingCellId||logNav(u)};tc.append(td);r.append(tc)
+function uiBack() {
+  log(`↘️ uiBack`);
+  uiIndex = uiIndex ? uiIndex - 1 : uiArray.length - 1;
+  uiRender();
+}
 
-        // Data Cells (Select/Edit)
-        fieldNames.map(f=>{
-          const c=D.createElement('div'),i=`${u}::${f}`
-          c.className='Cell DataCell';c.setAttribute(dataKeys.id,i);c.textContent=item[f]
-          selectedCells.has(i)&&c.classList.add('Selected')
-          c.onclick=e=>handleTap(e,u,f,i)
-          c.addEventListener('touchstart',handlePressStart)
-          c.addEventListener('touchmove',handlePressMove)
-          c.addEventListener('touchend',handlePressEnd)
-          r.append(c)
-        })
-        B.append(r)
-      })
-    }
+function uiRender() {
+  log(`↘️ uiRender`);
+  const name = uiArray[uiIndex];
+  document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+  log(`✓ Active mode: ${name} (${uiModes[name]})`);
 
-    // --- EDITING LOGIC ---
-    const saveEdit = (u,f,input,masterCell)=>{
-      const v=input.value
-      if(selectedCells.size>0){
-        selectedCells.forEach(i=>{
-          const [tU,tF]=i.split('::')
-          inventory[tU][tF]=v,logEdit(i,v)
-          const tE=D.querySelector(`[${dataKeys.id}="${i}"]`)
-          tE&&(tE.textContent=v,tE.classList.remove('Selected'))
-        })
-      }else{
-        inventory[u][f]=v,logEdit(`${u}::${f}`,v)
-      }
-      masterCell.innerHTML='',masterCell.textContent=v,masterCell.classList.remove('Editing')
-      clearSelection(),editingCellId=null
-    }
+  // Render the table ONLY when entering table mode
+  if (name === 'mode-table') {
+    createHeader(); 
+    renderInventory();
+  }
+}
 
-    const handleTap = (e,u,f,i)=>{
-      e.stopPropagation() 
+/***** GEMINI TABLE COMPONENT LOGIC (camelCase, space-maximized) *****/
+const dataKeys = {uuid:'data-uuid', id:'data-cell-id'}
+let selectedCells = new Set()
+let editingCellId = null
+let pressTimer = null
+let startX = 0, startY = 0
+const longPressTime = 500, moveTolerance = 10
+const D = document, H = D.getElementById('GridHeader'), B = D.getElementById('GridBody')
 
-      if(editingCellId)D.querySelector(`[${dataKeys.id}="${editingCellId}"] input`).blur()
+// --- LOGGING UTILITIES ---
+const logSelected = ()=>log('Selected Cells:',[...selectedCells])
+const logSelect = ()=>log(`SELECT:${selectedCells.size} [${[...selectedCells].join(',')}]`)
+
+
+// --- SELECTION UTILITIES ---
+const clearSelection = ()=>{
+  D.querySelectorAll('.Selected').forEach(c=>c.classList.remove('Selected'))
+  selectedCells.clear(); logSelect()
+}
+const toggleSelection = (element, id)=>{
+  selectedCells.has(id)?selectedCells.delete(id):selectedCells.add(id)
+  element.classList.toggle('Selected'); logSelect()
+}
+
+// --- RENDERING ---
+const createHeader = ()=>{
+  H.innerHTML='';
+  // Thumb column header + Schema names
+  ['ACT',...schema].map(field=>{
+    const c=D.createElement('div');
+    c.className='Cell HeaderCell';
+    c.textContent=field.name || field; // Use field.name for schema or string 'ACT'
+    H.append(c)
+  })
+}
+
+const renderInventory = ()=>{
+  B.innerHTML='';
+  
+  Object.entries(inventory).map(([uuid,item])=>{
+    const r=D.createElement('div');r.className='Row';r.setAttribute(dataKeys.uuid,uuid)
+    const parsedValues = valuesStringToArray(item.values, schema);
+
+    // Leftmost Cell (Navigation: ACT/Thumbnail)
+    const tc=D.createElement('div');tc.className='Cell ThumbCell';tc.setAttribute(dataKeys.id,`${uuid}::t`)
+    const td=D.createElement('div');td.className='Thumb';
+    
+    // Using an <img> tag for the thumbnail content, as provided in the mock data
+    const img = D.createElement('img');
+    img.src = item.thumbnail;
+    img.width = 14; 
+    img.height = 14;
+    img.style.borderRadius = '2px';
+    
+    // Click action uses the required scaffold function
+    tc.onclick=e=>{e.stopPropagation();editingCellId||navigateToGalleryItem(uuid)};
+    tc.append(img);
+    r.append(tc)
+
+    // Data Cells (Select/Edit)
+    schema.map((field, fieldIndex)=>{
+      const fieldName = field.name;
+      const cellId = `${uuid}::${fieldName}`
+      // Get the value from the parsed array, defaulting to an empty string if out of bounds
+      const displayValue = parsedValues[fieldIndex]?.join(', ') || '';
       
-      const c=e.currentTarget
-      !selectedCells.has(i)&&clearSelection()
+      const c=D.createElement('div');
+      c.className='Cell DataCell';
+      c.setAttribute(dataKeys.id,cellId);
+      c.textContent=displayValue;
       
-      editingCellId=i;c.classList.add('Editing')
-      const input=D.createElement('input')
-      input.type='text';input.value=inventory[u][f]
-      c.textContent='';c.append(input);input.focus()
-      
-      input.onblur=()=>saveEdit(u,f,input,c)
-      
-      input.onkeydown = ev => {
-        ev.stopPropagation()
-        if(ev.key === 'Enter') ev.currentTarget.blur()
-      }
-    }
+      selectedCells.has(cellId)&&c.classList.add('Selected')
+      c.onclick=e=>handleTap(e,uuid,fieldName,fieldIndex,cellId, displayValue)
+      c.addEventListener('touchstart',handlePressStart)
+      c.addEventListener('touchmove',handlePressMove)
+      c.addEventListener('touchend',handlePressEnd)
+      r.append(c)
+    })
+    B.append(r)
+  })
+}
 
-    // --- TOUCH/LONG-PRESS LOGIC ---
-    const handlePressStart = e=>{
-      if(editingCellId)return clearTimeout(pressTimer),pressTimer=null
-      const c=e.currentTarget,i=c.getAttribute(dataKeys.id)
-      startX=e.touches[0].clientX;startY=e.touches[0].clientY
-      pressTimer=setTimeout(()=>{toggleSelection(c,i);pressTimer=null},longPressTime)
-    }
-    const handlePressMove = e=>{
-      if(!pressTimer)return
-      const dx=Math.abs(e.touches[0].clientX-startX),dy=Math.abs(e.touches[0].clientY-startY)
-      if(dx>moveTolerance||dy>moveTolerance){clearTimeout(pressTimer);pressTimer=null}
-    }
-    const handlePressEnd = e=>pressTimer&&clearTimeout(pressTimer)
+// --- EDITING LOGIC ---
+const saveEdit = (uuid, fieldName, fieldIndex, input, masterCell)=>{
+  const newValue = input.value;
+  let newValuesArray = JSON.parse(JSON.stringify(valuesStringToArray(inventory[uuid].values, schema))); // Deep copy
+  
+  // 1. Update the values array based on the input type
+  // Simple text field update
+  newValuesArray[fieldIndex] = [newValue]; 
+  
+  const newValuesString = valuesArrayToString(newValuesArray);
 
-    // --- INIT ---
-    createHeader(); renderInventory()
+  // 2. Perform batched/multi-cell update
+  if(selectedCells.size > 0){
+    selectedCells.forEach(id=>{
+      const [tU,tF]=id.split('::')
+      const tFI = schema.findIndex(f => f.name === tF); // Target Field Index
+      
+      let tVArray = valuesStringToArray(inventory[tU].values, schema);
+      tVArray[tFI] = [newValue];
+      const tVString = valuesArrayToString(tVArray);
+      
+      // Update inventory object and trigger mock file sync
+      inventoryUpdate({[tU]: {...inventory[tU], values: tVString}});
+      
+      const tE=D.querySelector(`[${dataKeys.id}="${id}"]`);
+      tE&&(tE.textContent=newValue,tE.classList.remove('Selected'))
+    })
+  }else{
+    // Single cell update
+    inventoryUpdate({[uuid]: {...inventory[uuid], values: newValuesString}});
+  }
+
+  // Final cleanup and render state
+  masterCell.innerHTML='',masterCell.textContent=newValue,masterCell.classList.remove('Editing')
+  clearSelection(),editingCellId=null
+}
+
+const handleTap = (e,uuid,fieldName,fieldIndex,cellId, currentValue)=>{
+  e.stopPropagation() 
+
+  if(editingCellId)D.querySelector(`[${dataKeys.id}="${editingCellId}"] input`).blur()
+  
+  const c=e.currentTarget
+  !selectedCells.has(cellId)&&clearSelection()
+  
+  editingCellId=cellId;c.classList.add('Editing')
+  const input=D.createElement('input')
+  input.type='text';input.value=currentValue
+  c.textContent='';c.append(input);input.focus()
+  
+  input.onblur=()=>saveEdit(uuid,fieldName,fieldIndex,input,c)
+  
+  input.onkeydown = ev => {
+    ev.stopPropagation()
+    if(ev.key === 'Enter') ev.currentTarget.blur()
+  }
+}
+
+// --- TOUCH/LONG-PRESS LOGIC ---
+const handlePressStart = e=>{
+  if(editingCellId)return clearTimeout(pressTimer),pressTimer=null
+  const c=e.currentTarget,i=c.getAttribute(dataKeys.id)
+  startX=e.touches[0].clientX;startY=e.touches[0].clientY
+  pressTimer=setTimeout(()=>{toggleSelection(c,i);pressTimer=null},longPressTime)
+}
+const handlePressMove = e=>{
+  if(!pressTimer)return
+  const dx=Math.abs(e.touches[0].clientX-startX),dy=Math.abs(e.touches[0].clientY-startY)
+  if(dx>moveTolerance||dy>moveTolerance){clearTimeout(pressTimer);pressTimer=null}
+}
+const handlePressEnd = e=>pressTimer&&clearTimeout(pressTimer)
+
+// --- INIT (Called by uiRender) ---
+log('🚀 Scaffold v18.16 loading...');
+uiRender();
+log('✓ Scaffold loaded. Table mode active. Navigation: ⬅️➡️ buttons at top');
+log('📋 Inventory has ' + Object.keys(inventory).length + ' items');
+log('📐 Schema has ' + schema.length + ' fields');
   </script>
 </body>
 </html>
