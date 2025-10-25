@@ -957,8 +957,8 @@ const Table = (function() {
     const currentSchema = schemaGet();
     const columnCount = currentSchema.length;
     domBodyEl().parentElement.style.setProperty('--cols', columnCount);
-    const headerCellsHtml = currentSchema.map(f => `<div class="Cell">${f.name}</div>`).join('');
-    domHeaderEl().innerHTML = '<div class="Cell">📷</div>' + headerCellsHtml;
+    const headerCellsHtml = currentSchema.map(f => `<div class="table-cell">${f.name}</div>`).join('');
+    domHeaderEl().innerHTML = '<div class="table-cell">📷</div>' + headerCellsHtml;
     const rowsHtml = Object.entries(inventory).map(([uuid, inventoryItem]) => {
       const fieldValues = uuidFieldsFromInventory(uuid);
       if (!fieldValues) return '';
@@ -966,9 +966,9 @@ const Table = (function() {
         ? `<img src="${inventoryItem.thumbnail}" style="width:38px;height:38px;object-fit:cover">`
         : '📷';
       const dataCellsHtml = currentSchema.map(schemaField => 
-        `<div class="Cell" data-uuid="${uuid}" data-field="${schemaField.name}">${fieldValues[schemaField.name] || ''}</div>`
+        `<div class="table-cell" data-uuid="${uuid}" data-field="${schemaField.name}">${fieldValues[schemaField.name] || ''}</div>`
       ).join('');
-      return `<div class="Row"><div class="Cell" data-uuid="${uuid}" data-thumb="true">${thumbnailHtml}</div>${dataCellsHtml}</div>`;
+      return `<div class="table-row"><div class="table-cell" data-uuid="${uuid}" data-thumb="true">${thumbnailHtml}</div>${dataCellsHtml}</div>`;
     }).join('');
     domBodyEl().innerHTML = rowsHtml;
     domBodyEl().addEventListener('click', handleCellClickEvent);
