@@ -5,35 +5,72 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Elegant Mobile Grid</title>
   <style>
-    /* Web 2.0 Plain CSS */
-    body {margin:0;font:14px 'Courier New', monospace}
+    /* Web 2.0 Space-Maximized CSS */
+    body {
+      margin: 0;
+      font: 14px 'Courier New', monospace;
+      overflow-x: auto; /* ENABLED horizontal scroll on the entire body */
+    }
     #App {
-      overflow-x: auto;
+      max-width: none; /* Removed constraint to allow width expansion */
+      width: fit-content; /* Width matches the inner grid content */
+      margin: 0 auto;
     }
-    #GridHeader,.Row {
-      display:grid;
-      grid-template-columns:64px repeat(4,1fr);
-      border-bottom:1px solid #000;
-      min-height:40px;
-      align-items:center
+    #GridHeader, .Row {
+      display: grid;
+      /* Fixed column widths to enable scrolling: 40px (Thumb) + 4 Data columns */
+      grid-template-columns: 40px 140px 140px 140px 166px; 
+      width: 626px; /* Total fixed width for inner content */
+      border-bottom: 1px solid #000;
+      min-height: 16px; /* Reduced to minimum */
+      align-items: center;
     }
-    #GridHeader {font-weight:bold;background:#ccc}
-    .Cell {padding:4px;overflow:hidden;white-space:nowrap;user-select:none;touch-action:manipulation}
+    #GridHeader {
+      font-weight: bold;
+      background: #ccc;
+    }
+    .Cell {
+      /* Removed all padding */
+      overflow: hidden;
+      white-space: nowrap;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    .ThumbCell {
+      text-align: center;
+    }
     .Thumb {
-      width:40px;height:40px;margin:0 auto;background:#666;color:#fff;
-      display:flex;align-items:center;justify-content:center
+      /* Collapsed height to fit text, removed margin/padding */
+      width: 100%; 
+      height: 14px; 
+      background: #666;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
     }
     /* Stark, clear state indicators */
-    .Selected {background:#8cf} 
-    .Editing {background:#ff8}
-    input {width:98%;box-sizing:border-box;font:inherit;padding:2px;border:1px solid #000}
+    .Selected {
+      background: #8cf;
+    } 
+    .Editing {
+      background: #ff8;
+    }
+    input {
+      width: 98%;
+      box-sizing: border-box;
+      font: inherit;
+      padding: 0; /* Removed padding */
+      border: 1px solid #000;
+    }
   </style>
 </head>
 <body>
   <div id="App">
     <div id="GridHeader"></div>
     <div id="GridBody"></div>
-    <div style="padding:16px;text-align:center">
+    <div style="padding:4px;text-align:center">
       <button onclick="logSelected()">LOG SELECTED CELL IDs</button>
       <button onclick="clearSelection()">CLEAR SELECTION</button>
     </div>
@@ -69,7 +106,7 @@
     // --- RENDERING ---
     const createHeader = ()=>{
       H.innerHTML='';
-      ['ACTION',...fieldNames].map(text=>{const c=D.createElement('div');c.className='HeaderCell';c.textContent=text;H.append(c)})
+      ['ACT',...fieldNames].map(text=>{const c=D.createElement('div');c.className='HeaderCell';c.textContent=text;H.append(c)})
     }
     const renderInventory = ()=>{
       B.innerHTML='';
@@ -114,7 +151,6 @@
     }
 
     const handleTap = (e,u,f,i)=>{
-      // Defensive: Stop click/tap event from bubbling up to avoid conflicts.
       e.stopPropagation() 
 
       if(editingCellId)D.querySelector(`[${dataKeys.id}="${editingCellId}"] input`).blur()
@@ -129,7 +165,6 @@
       
       input.onblur=()=>saveEdit(u,f,input,c)
       
-      // Fix for Backspace: Stop propagation on keydown to ensure input handles the key.
       input.onkeydown = ev => {
         ev.stopPropagation()
         if(ev.key === 'Enter') ev.currentTarget.blur()
