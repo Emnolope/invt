@@ -81,25 +81,25 @@ button:active {
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
-.g-grid-item {
+.gallery-item {
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
   cursor: pointer;
 }
 /***** TABLE GRID *****/
-#t-header, .table-row{
+#t-header, .table-row {
   display:grid;
   grid-template-columns:40px repeat(var(--cols),1fr);
   gap:1px
 }
-#t-header{
+#t-header {
   position:sticky;
   top:0;
   background:#ccc;
   font-weight:bold
 }
-.table-cell{
+.table-cell {
   background:#fff;
   padding:4px;
   overflow:hidden;
@@ -112,7 +112,7 @@ button:active {
   background:#ff8;
   padding:0
 }
-.table-cell input{
+.table-cell input {
   width:100%;
   font:inherit;
   border:1px solid #000;
