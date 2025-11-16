@@ -365,7 +365,11 @@ function metadataDefault() {
   return {
     [timestamp]: {
       ext: "jpg",
-      values: "",
+      values: 
+        valuesArrayToString(
+          schemaGet().map(() => [])
+        )
+      ,
       thumbnail: null
     }
   };
