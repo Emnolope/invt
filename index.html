@@ -253,6 +253,7 @@ async function init() {
     await schemaLoadButton();
     await schemaLearnButton();
     await inventoryLoadButton();
+    await cacheLoad();
     uiRender();
     await Camera.init();
   } catch (e) {
