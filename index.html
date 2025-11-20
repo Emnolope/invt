@@ -319,7 +319,7 @@ async function directoryList() {
   for await (const [name, handle] of folder.entries()) {
     if (handle.kind === 'file') files.push(name);
   }
-  return files.sort();
+  return files.sort().reverse();
 }
 async function directoryPick() {
   log(`↘️directoryPick`);
